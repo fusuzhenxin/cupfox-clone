@@ -22,12 +22,49 @@ DATA = ROOT / "data.jsonl"
 SITE = "茶杯狐"
 TAGLINE = "片荒剧荒就来茶杯狐"
 ORIGIN = "https://www.cupfox.xin"
+SITE_KEYWORDS = (
+    "茶杯狐,Cupfox,电影推荐,电视剧推荐,高分电影,豆瓣高分,IMDB高分,"
+    "奥斯卡最佳影片,今晚看什么,片单,片荒,国产剧,美剧推荐,日剧,韩剧,"
+    "动漫推荐,纪录片,悬疑电影,科幻电影,经典电影,观看顺序"
+)
+HOME_TITLE = f"{SITE} - 电影电视剧推荐与高分片单 | {TAGLINE}"
+HOME_DESCRIPTION = (
+    "茶杯狐是电影电视剧推荐与高分片单站。收录豆瓣高分、IMDB、奥斯卡最佳影片、"
+    "国产剧、美剧、日剧、韩剧、动漫和纪录片名单，按类型、导演、演员和观看顺序挑片，解决片荒。不提供在线播放。"
+)
+HUB_BLURBS = {
+    "featured": "精选电影电视剧片单，覆盖豆瓣高分、IMDB、奥斯卡、类型题材与观看顺序。",
+    "region": "按地区与形式挑片：国产剧、美剧、日剧、韩剧、港剧、台剧、纪录片和动漫。",
+    "genre": "按类型挑电影：动作、喜剧、科幻、悬疑、爱情、恐怖、动画、战争、犯罪。",
+    "subgenre": "更细的口味片单：功夫、公路、青春校园、美食、穿越、监狱、机器人。",
+    "style": "按风格找片：暴力美学、哥特、废土、表现主义、新现实主义。",
+    "order": "系列观看顺序：漫威、DC、名侦探柯南等，先看哪一部不用猜。",
+    "award": "奥斯卡最佳影片、最佳导演、最佳演员等获奖作品名单。",
+    "pro": "AFI、Letterboxd 等专业评选片单，按共识挑高分电影。",
+    "director": "导演代表作片单，从导演入口走进他们最值得看的作品。",
+    "actor": "演员代表作片单，按主演找下一部值得看的电影电视剧。",
+}
 
 NAV_LINKS = (("home", "index.html", "首页"), ("lists", "lists.html", "片单"), ("posts", "posts.html", "文章"))
 
 
 def esc(value) -> str:
     return html.escape(str(value or ""), quote=True)
+
+
+def seo_keywords(*parts: str) -> str:
+    seen: list[str] = []
+    for part in parts:
+        for item in str(part or "").split(","):
+            item = item.strip()
+            if item and item not in seen:
+                seen.append(item)
+    return ",".join(seen[:28])
+
+
+def clip_desc(text: str, limit: int = 180) -> str:
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def file_slug(item_id: str) -> str:
@@ -181,12 +218,69 @@ def nav_html(page: str) -> str:
 
 
 def foot_html() -> str:
-    return '''<footer><div class="wrap foot-in">
-  <div><div class="logo" style="font-size:20px;margin-bottom:10px"><img src="logo.png" width="28" height="28" alt=""><span><span style="color:#ff705b;font-weight:900">Cupfox</span> 茶杯狐</span></div>
-    <div class="foot-links"><a href="about.html#about">关于茶杯狐</a><a href="about.html#copyright">版权声明</a><a href="about.html#contact">联系我们</a><a href="about.html#complaint">侵权投诉</a><a href="about.html#help">帮助反馈</a></div>
-    <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p></div>
-  <div class="foot-links"><a href="index.html">首页</a><a href="lists.html">片单</a><a href="posts.html">文章</a></div>
-</div><div class="wrap"><div class="copy">© Cupfox · 公开影视片单与文章的本地归档展示 · 不提供在线播放</div></div></footer>'''
+    return '''<footer>
+  <div class="wrap foot-grid">
+    <div class="foot-brand">
+      <div class="logo" style="font-size:20px;margin-bottom:10px"><img src="logo.png" width="28" height="28" alt="茶杯狐"><span><span style="color:#ff705b;font-weight:900">Cupfox</span> 茶杯狐</span></div>
+      <p class="foot-desc">茶杯狐是电影电视剧推荐与高分片单导航站。收录豆瓣高分、IMDB 高分、奥斯卡最佳影片、国产剧、美剧、日剧、韩剧、动漫和纪录片名单，按类型、导演、演员和观看顺序帮你解决片荒、挑今晚看什么。本站展示公开片单与编辑文章，不提供在线播放。</p>
+      <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p>
+    </div>
+    <div class="foot-col">
+      <h3>热门分类</h3>
+      <a href="lists.html">精选片单</a>
+      <a href="cat/genre.html">类型题材</a>
+      <a href="cat/region.html">国产剧 / 美剧 / 日韩</a>
+      <a href="cat/award.html">奥斯卡获奖作品</a>
+      <a href="cat/order.html">系列观看顺序</a>
+      <a href="cat/director.html">导演代表作</a>
+      <a href="cat/actor.html">演员代表作</a>
+      <a href="posts.html">影视盘点文章</a>
+    </div>
+    <div class="foot-col">
+      <h3>高分片单</h3>
+      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a>
+      <a href="list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a>
+      <a href="list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a>
+      <a href="list/list-豆瓣高分日剧推荐.html">豆瓣高分日剧</a>
+      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分欧美剧</a>
+      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a>
+      <a href="list/list-经典悬疑电影推荐.html">悬疑电影推荐</a>
+      <a href="list/list-经典科幻电影推荐.html">科幻电影推荐</a>
+    </div>
+    <div class="foot-col">
+      <h3>站点与帮助</h3>
+      <a href="index.html">首页 · 今晚看什么</a>
+      <a href="about.html#about">关于茶杯狐</a>
+      <a href="about.html#copyright">版权声明</a>
+      <a href="about.html#contact">联系我们</a>
+      <a href="about.html#complaint">侵权投诉</a>
+      <a href="about.html#help">帮助反馈</a>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="foot-keys" aria-label="热门搜索">
+      <a href="index.html">电影推荐</a>
+      <a href="index.html">电视剧推荐</a>
+      <a href="index.html">今晚看什么</a>
+      <a href="lists.html">高分片单</a>
+      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分</a>
+      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分</a>
+      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡</a>
+      <a href="list/list-大陆经典电影推荐.html">国产电影</a>
+      <a href="list/list-经典动作电影推荐.html">动作电影</a>
+      <a href="list/list-经典喜剧电影推荐.html">喜剧电影</a>
+      <a href="list/list-经典爱情电影推荐.html">爱情电影</a>
+      <a href="list/list-经典恐怖电影推荐.html">恐怖电影</a>
+      <a href="list/list-经典动画电影推荐.html">动画电影</a>
+      <a href="list/list-经典纪录片电影推荐.html">纪录片</a>
+      <a href="list/list-豆瓣高分国漫推荐.html">国漫推荐</a>
+      <a href="list/list-豆瓣高分日漫推荐.html">日漫推荐</a>
+      <a href="cat/order.html">观看顺序</a>
+      <a href="posts.html">影视盘点</a>
+    </div>
+    <div class="copy">© Cupfox 茶杯狐 · 公开影视片单与文章的本地归档展示 · 电影推荐 / 电视剧推荐 / 高分片单 · 不提供在线播放</div>
+  </div>
+</footer>'''
 
 
 def page_doc(
@@ -203,6 +297,7 @@ def page_doc(
     image: str = "",
     scripts: str = "",
     path: str = "",
+    keywords: str = "",
 ) -> str:
     base = "../" if nested else "./"
     robots = "noindex,follow" if noindex else "index,follow"
@@ -210,9 +305,11 @@ def page_doc(
     canon = f'<link rel="canonical" href="{esc(canonical)}"/>' if canonical else ""
     og_url = f'<meta property="og:url" content="{esc(canonical)}"/>' if canonical else ""
     og_img = f'<meta property="og:image" content="{esc(image)}"/>' if image else ""
+    keys = seo_keywords(keywords or (SITE_KEYWORDS if not noindex else ""))
+    key_tag = f'<meta name="keywords" content="{esc(keys)}"/>' if keys and not noindex else ""
     ld = ""
     if json_ld:
-        if canonical and "url" not in json_ld:
+        if canonical and "url" not in json_ld and "@graph" not in json_ld:
             json_ld = {**json_ld, "url": canonical}
         ld = "<script type=\"application/ld+json\">" + json.dumps(json_ld, ensure_ascii=False).replace("<", "\\u003c") + "</script>"
     cls = f' class="{body_class}"' if body_class else ""
@@ -223,11 +320,13 @@ def page_doc(
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <base href="{base}"/>
 <title>{esc(title)}</title>
-<meta name="description" content="{esc(description)}"/>
+<meta name="description" content="{esc(clip_desc(description))}"/>
+{key_tag}
 <meta name="robots" content="{robots}"/>
 <meta property="og:site_name" content="{SITE}"/>
+<meta property="og:locale" content="zh_CN"/>
 <meta property="og:title" content="{esc(title)}"/>
-<meta property="og:description" content="{esc(description)}"/>
+<meta property="og:description" content="{esc(clip_desc(description))}"/>
 <meta property="og:type" content="website"/>
 {og_url}
 {og_img}
@@ -459,6 +558,9 @@ def desc_movie(movie, n_lists: int) -> str:
     bits = [movie.get("title") or "影片"]
     if movie.get("year"):
         bits.append(str(movie["year"]))
+    tags = "、".join((movie.get("tags") or [])[:4])
+    if tags:
+        bits.append(tags)
     if movie.get("director"):
         bits.append("导演" + movie["director"])
     if movie.get("rate"):
@@ -466,7 +568,9 @@ def desc_movie(movie, n_lists: int) -> str:
     bits.append(f"入选{n_lists}个片单")
     syn = (movie.get("syn") or "").strip()
     text = "，".join(bits) + "。" + syn
-    return text[:160]
+    title = movie.get("title") or "这部影片"
+    text += f"{title}电影推荐，可对照豆瓣评分与站内高分片单继续挑片。"
+    return clip_desc(text)
 
 
 def write(path: Path, text: str):
@@ -523,23 +627,66 @@ def render_index(data) -> str:
             f'<a class="btn-sm" href="{esc(cat_url(cat["id"]))}">更多</a></div>'
             f'<div class="sec-row">{cards}</div></section>'
         )
+    cover = posts[0].get("cover") if posts else ""
     body = f'''<section><div class="wrap">
   <div class="hero-split">
     <div id="heroBig" class="hero-carousel">{"".join(slides)}{arrows}</div>
     <div class="hero-cats" id="heroCats">{"".join(cat_tiles)}</div>
   </div>
 </div></section>
-<main class="wrap" id="cats">{"".join(sections)}</main>'''
-    cover = posts[0].get("cover") if posts else ""
+<main class="wrap" id="cats">
+  <h1 class="home-h1">茶杯狐 · 电影电视剧推荐与高分片单</h1>
+  {"".join(sections)}
+  <section class="home-seo" aria-label="站点介绍">
+    <h2>片荒剧荒就来茶杯狐</h2>
+    <p>想找电影推荐、电视剧推荐或今晚看什么时，先看豆瓣高分、IMDB 高分和奥斯卡最佳影片，再按动作、喜剧、科幻、悬疑、爱情、动画这些类型往下翻。国产剧、美剧、日剧、韩剧、港剧、纪录片、国漫和日漫都做成了片单；系列作品还有观看顺序，导演和演员也能从代表作入口进去。</p>
+    <p>每部影片会标出它还出现在哪些名单里，方便顺着高分片单继续挑，而不是只看一个评分。茶杯狐只做公开片单与文章的本地展示，不提供在线播放。</p>
+    <div class="home-seo-links">
+      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a>
+      <a href="list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a>
+      <a href="list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a>
+      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a>
+      <a href="list/list-经典悬疑电影推荐.html">悬疑电影</a>
+      <a href="list/list-经典科幻电影推荐.html">科幻电影</a>
+      <a href="cat/order.html">观看顺序</a>
+      <a href="posts.html">影视盘点</a>
+    </div>
+  </section>
+</main>'''
     return page_doc(
-        title=f"{SITE} - {TAGLINE}",
-        description="根据公开片单挑今晚看什么。按分类浏览名单，按共现关系看一部片还出现在哪些单子里。不提供在线播放。",
+        title=HOME_TITLE,
+        description=HOME_DESCRIPTION,
         nested=False,
         page="home",
         body=body,
         image=cover if is_img(cover or "") else "",
         scripts="<script>Cupfox.loadData().then(d=>{Cupfox.bindTonight(document.getElementById('tonight'), d);Cupfox.bindHero(document.getElementById('heroBig'), d.posts);});</script>",
         path="index.html",
+        keywords=SITE_KEYWORDS,
+        json_ld={
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "WebSite",
+                    "name": SITE,
+                    "alternateName": ["Cupfox", "茶杯狐电影推荐"],
+                    "url": abs_url("index.html"),
+                    "description": HOME_DESCRIPTION,
+                    "inLanguage": "zh-CN",
+                    "publisher": {"@type": "Organization", "name": SITE, "email": "2201219073@qq.com"},
+                },
+                {
+                    "@type": "ItemList",
+                    "name": "茶杯狐热门片单",
+                    "itemListElement": [
+                        {"@type": "ListItem", "position": 1, "name": "豆瓣高分国产剧推荐", "url": abs_url("list/list-豆瓣高分国产剧推荐.html")},
+                        {"@type": "ListItem", "position": 2, "name": "豆瓣高分美剧推荐", "url": abs_url("list/list-豆瓣高分美剧推荐.html")},
+                        {"@type": "ListItem", "position": 3, "name": "历届奥斯卡最佳影片", "url": abs_url("list/list-历届奥斯卡最佳影片.html")},
+                        {"@type": "ListItem", "position": 4, "name": "经典悬疑电影推荐", "url": abs_url("list/list-经典悬疑电影推荐.html")},
+                    ],
+                },
+            ],
+        },
     )
 
 
@@ -555,17 +702,19 @@ def render_hub(data, cat_id: str) -> str:
     body = f'''<div class="wrap hub">
   <aside class="side-menu">{menu}</aside>
   <main>
-    <h1 class="hub-title">{esc(title)} · {len(lists)}</h1>
+    <h1 class="hub-title">{esc(title)} · {len(lists)} 份电影电视剧片单</h1>
     <div class="hub-grid">{grid}</div>
   </main>
 </div>'''
+    blurb = HUB_BLURBS.get(cat_id, "按名单挑电影电视剧。")
     return page_doc(
-        title=f"{title} - {SITE}",
-        description=f"{title}共{len(lists)}份片单，按名单挑片。",
+        title=f"{title} - 电影电视剧推荐片单 | {SITE}",
+        description=clip_desc(f"{title}共{len(lists)}份片单。{blurb}适合片荒时按高分名单挑今晚看什么。"),
         nested=(cat_id != "featured"),
         page="lists",
         body=body,
         path=cat_url(cat_id),
+        keywords=seo_keywords(title, "电影推荐,电视剧推荐,高分片单,今晚看什么", SITE_KEYWORDS),
     )
 
 
@@ -592,13 +741,18 @@ def render_list(lst, data) -> str:
   </div>
 </div>'''
     return page_doc(
-        title=f'{lst.get("name")} - {SITE}',
-        description=f'{lst.get("name")}（{cat_name}）共{len(movies)}部。' + (names + "。如果想继续看名单里的其它作品。" if names else ""),
+        title=f'{lst.get("name")} - 电影电视剧推荐 | {SITE}',
+        description=clip_desc(
+            f'{lst.get("name")}（{cat_name}）共{len(movies)}部电影电视剧推荐。'
+            + (f"{names}。" if names else "")
+            + "含豆瓣评分、导演主演，适合片荒时按名单挑片。"
+        ),
         nested=True,
         page="lists",
         body=body,
         body_class="list-detail-page",
         image=lst.get("cover") if is_img(lst.get("cover") or "") else "",
+        keywords=seo_keywords(lst.get("name"), cat_name, names.replace("、", ","), "片单,电影推荐,电视剧推荐,豆瓣高分"),
         json_ld={
             "@context": "https://schema.org",
             "@type": "ItemList",
@@ -743,22 +897,31 @@ def render_movie(movie, data) -> str:
         image=movie.get("cover") if is_img(movie.get("cover") or "") else "",
         json_ld=movie_json_ld(movie),
         path=movie_url(movie["id"]),
+        keywords=seo_keywords(
+            movie.get("title"),
+            movie.get("orig"),
+            movie.get("director"),
+            ",".join((movie.get("actors") or [])[:4]),
+            ",".join(movie.get("tags") or []),
+            "电影推荐,豆瓣评分,高分片单",
+        ),
     )
 
 
 def render_posts(data) -> str:
     grid = "".join(hub_card(p["title"], p, post_url(p["id"])) for p in data["posts"])
     body = f'''<div class="wrap">
-  <h1 class="hub-title" style="padding-top:20px">全部文章</h1>
+    <h1 class="hub-title" style="padding-top:20px">影视盘点文章 · 电影电视剧推荐</h1>
   <div class="hub-grid" style="--side-w:auto">{grid}</div>
 </div>'''
     return page_doc(
-        title=f"文章 - {SITE}",
-        description="编辑精选的影视盘点与预告文章。",
+        title=f"影视盘点文章 - 电影电视剧推荐 | {SITE}",
+        description="茶杯狐影视盘点与预告：高分国产剧、悬疑电影、动画电影、奥斯卡和院线看点，帮你决定今晚看什么。",
         nested=False,
         page="posts",
         body=body,
         path="posts.html",
+        keywords=seo_keywords("影视盘点,电影推荐,国产剧,悬疑电影,动画电影,奥斯卡", SITE_KEYWORDS),
     )
 
 
@@ -793,7 +956,10 @@ def render_post(post) -> str:
     <nav class="toc"><h4>内容导航</h4><div class="toc-links">{toc}</div></nav>
   </div>
 </div>'''
-    desc = (post.get("intro") or post.get("title") or "")[:160]
+    desc = clip_desc(
+        (post.get("intro") or post.get("title") or "")
+        + "茶杯狐影视盘点，电影电视剧推荐与今晚看什么参考。"
+    )
     return page_doc(
         title=f'{post.get("title")} - {SITE}',
         description=desc,
@@ -803,6 +969,7 @@ def render_post(post) -> str:
         image=post.get("cover") if is_img(post.get("cover") or "") else "",
         json_ld={"@context": "https://schema.org", "@type": "Article", "headline": post.get("title"), "author": post.get("author"), "datePublished": post.get("date")},
         path=post_url(post["id"]),
+        keywords=seo_keywords(post.get("title"), ",".join(post.get("tags") or []), "影视盘点,电影推荐,今晚看什么"),
     )
 
 
@@ -810,9 +977,9 @@ ABOUT_BODY = '''<div class="wrap">
   <div class="crumb"><a href="index.html">首页</a><span class="sep">/</span><span>关于与联系</span></div>
   <article class="page-doc">
     <h1>关于与联系</h1>
-    <p class="lead">片荒时用来挑片，不是播放站。</p>
+    <p class="lead">电影电视剧推荐与高分片单导航，片荒时用来挑片，不是播放站。</p>
     <h2 id="about">关于茶杯狐</h2>
-    <p>本站把公开的影视片单和编辑文章做成可检索的本地展示：按分类逛名单、按共现关系看一部片还出现在哪些单子里，并用「今晚看什么」在几个标签里给出三部今晚能看的。</p>
+    <p>本站把公开的影视片单和编辑文章做成可检索的本地展示：按豆瓣高分、奥斯卡、类型题材和观看顺序逛名单，按共现关系看一部片还出现在哪些单子里，并用「今晚看什么」在几个标签里给出三部今晚能看的。</p>
     <p>站点没有账号，也不提供在线播放。海报和正文保留原公开来源，方便对照查阅。</p>
     <h2 id="copyright">版权声明</h2>
     <p>片单名称、影片信息、海报和文章内容来自各自的公开来源，版权归原作者、原网站或权利人所有。本站仅作个人学习与浏览展示，不存储片源，不用于商业传播。</p>
@@ -911,7 +1078,8 @@ def main():
         ROOT / "about.html",
         page_doc(
             title=f"关于与联系 - {SITE}",
-            description="茶杯狐的介绍、版权声明、联系邮箱与侵权投诉方式。",
+            description="茶杯狐介绍：电影电视剧推荐与高分片单导航站，版权声明、联系邮箱与侵权投诉方式。不提供在线播放。",
+            keywords=seo_keywords("茶杯狐,关于茶杯狐,版权声明", SITE_KEYWORDS),
             nested=False,
             page="",
             body=ABOUT_BODY,
