@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /play.html
+Disallow: /detail.html
+Disallow: /list.html
+Disallow: /post.html
+
+Sitemap: https://www.cupfox.xin/sitemap.xml

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>播放 - 茶杯狐</title>
+<meta name="robots" content="noindex,follow"/>
+<link rel="icon" href="favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="logo.png"/>
+<link rel="apple-touch-icon" href="logo.png"/>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div id="nav"></div>
+<div class="wrap" id="playRoot">
+  <div class="crumb"><a href="index.html">首页</a><span class="sep">/</span><a href="lists.html">全部片单</a><span class="sep">/</span><span id="crumbName">播放</span></div>
+  <div class="player">
+    <div class="player-screen" id="screen">
+      <button class="play-btn" id="playBtn" aria-label="播放">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="player-tip" id="tip">示例播放器（Demo 占位，未接入真实片源）</div>
+    </div>
+    <div class="player-bar">
+      <span id="now">—</span>
+      <span class="src-pill" id="srcPill"></span>
+    </div>
+  </div>
+  <div class="block"><h2>选集</h2><div class="ep-grid" id="eps"></div></div>
+  <div style="margin:18px 0 40px"><a class="btn-sm" id="back">← 返回详情</a></div>
+</div>
+<div id="foot"></div>
+<script>window.PAGE='lists';</script>
+<script src="app.js"></script>
+<script>
+Cupfox.loadData().then(d=>{
+  const id=Cupfox.param('movie'), ep=Cupfox.param('ep'), src=Cupfox.param('src');
+  const m=d.movieById[id];
+  if(!m){ document.getElementById('playRoot').innerHTML='<div class="empty">未找到该影片</div>'; return; }
+  document.title=`播放 ${m.title} - 茶杯狐`;
+  document.getElementById('crumbName').textContent=m.title;
+  document.getElementById('back').href=Cupfox.detailUrl(id);
+  const label = ep?`第 ${ep} 集` : (src?`播放源 0${src}` : '正片');
+  document.getElementById('now').textContent=`${m.title} · ${label}`;
+  document.getElementById('srcPill').textContent= src?`播放源 0${src}`:'';
+  document.getElementById('playBtn').onclick=()=>{ document.getElementById('tip').textContent=`▶ 正在播放：${m.title} ${label}`; };
+  // 选集
+  const epBox=document.getElementById('eps');
+  if(m.episodes>0){
+    epBox.innerHTML=Array.from({length:m.episodes},(_,i)=>
+      `<a href="play.html?movie=${encodeURIComponent(id)}&ep=${i+1}" class="${(+ep===i+1)?'on':''}">${String(i+1).padStart(2,'0')}</a>`).join('');
+  } else {
+    epBox.parentElement.style.display='none';
+  }
+});
+</script>
+</body>
+</html>
