@@ -29,6 +29,7 @@ HOME_DESCRIPTION = (
     "和哪几部共享最多名单、系列该按什么顺序看。不转载影评，不提供播放。"
 )
 BUILD_DATE = date.today().isoformat()
+ASSET_V = "20260910d"
 HUB_BLURBS = {
     "featured": "这里是全部公开片单的入口。每份名单页会写出它和其它名单重叠了多少，而不是复述原名单的宣传语。",
     "region": "按出品地和形式归类的名单。同一部作品常常同时出现在地区名单和类型名单里，重叠关系在各名单页里。",
@@ -407,7 +408,7 @@ def page_doc(
 {og_img}
 {canon}
 <link rel="icon" href="/favicon.ico" sizes="any"/>
-<link rel="stylesheet" href="/styles.css"/>
+<link rel="stylesheet" href="/styles.css?v={ASSET_V}"/>
 {extra_head}
 {ld}
 </head>
@@ -416,7 +417,7 @@ def page_doc(
 {body}
 <div id="foot">{foot_html()}</div>
 <script>window.PAGE={json.dumps(page)};</script>
-<script src="/app.js"></script>
+<script src="/app.js?v={ASSET_V}"></script>
 {scripts}
 </body>
 </html>
@@ -655,7 +656,8 @@ def render_index(data) -> str:
         n = data["movie_list_n"].get(movie["id"], 0)
         crossed.append(
             f'<a class="cross-hit" href="{esc(movie_url(movie["id"]))}">'
-            f'{poster_block(movie)}<div><b>{esc(movie.get("title"))}</b>'
+            f'<span class="cross-hit-poster" style="position:relative;overflow:hidden;display:block;width:52px;height:74px;flex:0 0 52px">{poster_block(movie)}</span>'
+            f'<div><b>{esc(movie.get("title"))}</b>'
             f"<span>出现在 {n} 份片单</span></div></a>"
         )
     sections = [
