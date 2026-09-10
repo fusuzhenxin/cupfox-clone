@@ -141,6 +141,7 @@ const FOOT = `<footer>
       <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
+  <div class="wrap"><div class="foot-keys"><a href="/index.html">电影推荐</a><a href="/lists.html">高分片单</a><a href="/cat/order.html">观看顺序</a><a href="/list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a><a href="/list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a><a href="/list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a><a href="/list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a><a href="/list/list-豆瓣高分日剧推荐.html">豆瓣高分日剧</a><a href="/list/list-经典科幻电影推荐.html">经典科幻电影</a><a href="/list/list-经典悬疑电影推荐.html">经典悬疑电影</a><a href="/list/list-经典喜剧电影推荐.html">经典喜剧电影</a><a href="/list/list-宫崎骏代表作.html">宫崎骏代表作</a><a href="/list/list-克里斯托弗·诺兰代表作.html">诺兰代表作</a><a href="/list/list-漫威《复仇者联盟》系列观看顺序.html">漫威观看顺序</a><a href="/list/list-《哈利·波特》系列观看顺序.html">哈利波特观看顺序</a></div></div>
   <div class="wrap"><div class="copy">© Cupfox 茶杯狐 · 交叉索引 · 不提供在线播放</div></div>
 </footer>`;
 
@@ -381,7 +382,36 @@ function hubCard(title, obj, href){
   }
   return `<a class="hub-card" href="${href}">${bg}<div class="t">${title}</div></a>`;
 }
-function movieItem(m, num){
+function movieKind(m, listNames){
+  const blob=(listNames||[]).filter(Boolean).join(' ');
+  const tags=(m.tags||[]).join(' ');
+  if(tags.includes('纪录')||blob.includes('纪录片')) return '纪录片';
+  if(['国产剧','美剧','韩剧','日剧','港剧','台剧','英剧','欧美剧'].some(k=>blob.includes(k))) return '电视剧';
+  if(tags.includes('动画')||tags.includes('动漫')||['国漫','日漫','美漫'].some(k=>blob.includes(k))) return '动画';
+  return '电影';
+}
+function movieBlurb(m, nLists, listNames){
+  const kind=movieKind(m, listNames);
+  let head=`「${m.title||'这部作品'}」`;
+  if(m.year) head+=`（${m.year}）`;
+  head+=`是一部${kind}`;
+  const parts=[head];
+  if(m.director) parts.push(`由${m.director}执导`);
+  const actors=m.actors||[];
+  if(actors.length) parts.push('主演'+actors.slice(0,3).join('、'));
+  const tags=(m.tags||[]).slice(0,3).join('、');
+  if(tags) parts.push(`类型包括${tags}`);
+  if(m.region) parts.push(`出品地${m.region}`);
+  if(m.rate) parts.push(`豆瓣评分${m.rate}`);
+  if(nLists) parts.push(`在本站出现在${nLists}份片单中`);
+  const names=(listNames||[]).filter(Boolean);
+  if(names.length) parts.push('例如'+names.slice(0,4).join('、'));
+  const fact=parts.join('，')+'。页面只做片单对照，不提供播放。';
+  const syn=String(m.syn||'').trim();
+  if(syn.length>=20) return syn.replace(/。+$/,'')+'。'+fact;
+  return fact;
+}
+function movieItem(m, num, nLists, listNames){
   const stars = '★★★★★';
   const tags = (m.tags||[]).join(' ');
   const actors = (m.actors||[]).join(' / ');
@@ -399,6 +429,7 @@ function movieItem(m, num){
       <div class="m-meta"><b>标签</b>${[m.year,m.region,tags].filter(Boolean).join(' ')||'—'}</div>
       <div class="m-meta"><b>导演</b>${m.director||'—'}</div>
       <div class="m-meta"><b>主演</b>${actors||'—'}</div>
+      <p class="m-desc">${esc(movieBlurb(m, nLists||0, listNames))}</p>
     </div>
     ${m.badge?`<div class="m-badge-cell"><span class="m-badge">${m.badge}</span></div>`:''}
   </div>`;
@@ -686,7 +717,7 @@ function bindHero(root, posts){
   play();
 }
 
-window.Cupfox={ loadData, param, listUrl, detailUrl, postUrl, catUrl, palette, posterSvg, postCoverSvg, collageHtml, phFor, isImg, card, hubCard, movieItem, toc, tocArticle, runSearch, initChrome, esc, movieGraph, neighborWhy, bindTonight, bindHero };
+window.Cupfox={ loadData, param, listUrl, detailUrl, postUrl, catUrl, palette, posterSvg, postCoverSvg, collageHtml, phFor, isImg, card, hubCard, movieKind, movieBlurb, movieItem, toc, tocArticle, runSearch, initChrome, esc, movieGraph, neighborWhy, bindTonight, bindHero };
 
 /* 脚本置于 body 末尾，#nav 已存在，直接初始化 */
 initChrome();

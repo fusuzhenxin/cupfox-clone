@@ -29,7 +29,7 @@ HOME_DESCRIPTION = (
     "按类型、导演、演员和观看顺序挑片，也能查一部电影还进了哪些名单。不提供在线播放。"
 )
 BUILD_DATE = date.today().isoformat()
-ASSET_V = "20260910e"
+ASSET_V = "20260910f"
 HUB_BLURBS = {
     "featured": "这里是全部公开片单的入口。每份名单页会写出它和其它名单重叠了多少，而不是复述原名单的宣传语。",
     "region": "按出品地和形式归类的名单。同一部作品常常同时出现在地区名单和类型名单里，重叠关系在各名单页里。",
@@ -44,6 +44,23 @@ HUB_BLURBS = {
 }
 
 NAV_LINKS = (("home", "/index.html", "首页"), ("lists", "/lists.html", "片单"), ("method", "/method.html", "方法"))
+FOOT_LINKS = (
+    ("电影推荐", "/index.html"),
+    ("高分片单", "/lists.html"),
+    ("观看顺序", "/cat/order.html"),
+    ("奥斯卡最佳影片", "/list/list-历届奥斯卡最佳影片.html"),
+    ("豆瓣高分国产剧", "/list/list-豆瓣高分国产剧推荐.html"),
+    ("豆瓣高分美剧", "/list/list-豆瓣高分美剧推荐.html"),
+    ("豆瓣高分韩剧", "/list/list-豆瓣高分韩剧推荐.html"),
+    ("豆瓣高分日剧", "/list/list-豆瓣高分日剧推荐.html"),
+    ("经典科幻电影", "/list/list-经典科幻电影推荐.html"),
+    ("经典悬疑电影", "/list/list-经典悬疑电影推荐.html"),
+    ("经典喜剧电影", "/list/list-经典喜剧电影推荐.html"),
+    ("宫崎骏代表作", "/list/list-宫崎骏代表作.html"),
+    ("诺兰代表作", "/list/list-克里斯托弗·诺兰代表作.html"),
+    ("漫威观看顺序", "/list/list-漫威《复仇者联盟》系列观看顺序.html"),
+    ("哈利波特观看顺序", "/list/list-《哈利·波特》系列观看顺序.html"),
+)
 
 
 def esc(value) -> str:
@@ -264,10 +281,42 @@ def hub_card(title: str, obj: dict, href: str, data: dict | None = None) -> str:
     )
 
 
-def movie_item(movie: dict, num: int) -> str:
+def movie_blurb(movie: dict, n_lists: int = 0, list_names: list | None = None) -> str:
+    kind = movie_kind(movie, list_names)
+    title = movie.get("title") or "这部作品"
+    head = f"「{title}」"
+    if movie.get("year"):
+        head += f"（{movie['year']}）"
+    head += f"是一部{kind}"
+    parts = [head]
+    if movie.get("director"):
+        parts.append(f"由{movie['director']}执导")
+    actors = movie.get("actors") or []
+    if actors:
+        parts.append("主演" + "、".join(actors[:3]))
+    tags = "、".join((movie.get("tags") or [])[:3])
+    if tags:
+        parts.append(f"类型包括{tags}")
+    if movie.get("region"):
+        parts.append(f"出品地{movie['region']}")
+    if movie.get("rate"):
+        parts.append(f"豆瓣评分{movie['rate']}")
+    if n_lists:
+        parts.append(f"在本站出现在{n_lists}份片单中")
+    names = [name for name in (list_names or []) if name]
+    if names:
+        parts.append("例如" + "、".join(names[:4]))
+    fact = "，".join(parts) + "。页面只做片单对照，不提供播放。"
+    syn = (movie.get("syn") or "").strip()
+    if len(syn) >= 20:
+        return syn.rstrip("。") + "。" + fact
+    return fact
+
+
+def movie_item(movie: dict, num: int, n_lists: int = 0, list_names: list | None = None) -> str:
     tags = " ".join(movie.get("tags") or [])
     actors = " / ".join(movie.get("actors") or [])
-    kind = "series" if (movie.get("episodes") or 0) > 0 else "film"
+    kind = "series" if movie_kind(movie, list_names) == "电视剧" else "film"
     douban = ""
     if movie.get("douban_id"):
         href = f'https://movie.douban.com/subject/{esc(movie["douban_id"])}/'
@@ -289,6 +338,7 @@ def movie_item(movie: dict, num: int) -> str:
       <div class="m-meta"><b>标签</b>{esc(meta or "—")}</div>
       <div class="m-meta"><b>导演</b>{esc(movie.get("director") or "—")}</div>
       <div class="m-meta"><b>主演</b>{esc(actors or "—")}</div>
+      <p class="m-desc">{esc(movie_blurb(movie, n_lists, list_names))}</p>
     </div>
     {badge}
   </div>'''
@@ -342,6 +392,7 @@ def foot_html() -> str:
       <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
+  <div class="wrap"><div class="foot-keys">{"".join(f'<a href="{esc(href)}">{esc(label)}</a>' for label, href in FOOT_LINKS)}</div></div>
   <div class="wrap"><div class="copy">© Cupfox {SITE} · 交叉索引 · 不提供在线播放</div></div>
 </footer>'''
 
@@ -581,14 +632,14 @@ def movie_graph(movie, data):
     }
 
 
-def movie_json_ld(movie) -> dict:
+def movie_json_ld(movie, list_names: list | None = None) -> dict:
     data = {
         "@context": "https://schema.org",
         "@type": "Movie",
         "name": movie.get("title"),
         "inLanguage": "zh-CN",
     }
-    if movie.get("episodes") or 0:
+    if movie_kind(movie, list_names) == "电视剧":
         data["@type"] = "TVSeries"
     if movie.get("orig"):
         data["alternateName"] = movie["orig"]
@@ -612,42 +663,30 @@ def movie_json_ld(movie) -> dict:
     return data
 
 
-def movie_kind(movie: dict) -> str:
-    if movie.get("episodes") or 0:
-        return "电视剧"
+def movie_kind(movie: dict, list_names: list | None = None) -> str:
+    blob = " ".join(name for name in (list_names or []) if name)
     tags = " ".join(movie.get("tags") or [])
-    if "纪录" in tags:
+    if "纪录" in tags or "纪录片" in blob:
         return "纪录片"
-    if "动画" in tags or "动漫" in tags:
+    if any(
+        marker in blob
+        for marker in ("国产剧", "美剧", "韩剧", "日剧", "港剧", "台剧", "英剧", "欧美剧")
+    ):
+        return "电视剧"
+    if "动画" in tags or "动漫" in tags or any(marker in blob for marker in ("国漫", "日漫", "美漫")):
         return "动画"
     return "电影"
 
 
-def movie_page_title(movie: dict, n_lists: int) -> str:
+def movie_page_title(movie: dict, n_lists: int, list_names: list | None = None) -> str:
     title = movie.get("title") or "影片"
     year = f" {movie['year']}" if movie.get("year") else ""
-    kind = movie_kind(movie)
+    kind = movie_kind(movie, list_names)
     return f"{title}{year} {kind}推荐 - 入选{n_lists}份片单 | {SITE}"
 
 
-def desc_movie(movie, n_lists: int) -> str:
-    kind = movie_kind(movie)
-    bits = [movie.get("title") or "影片"]
-    if movie.get("year"):
-        bits.append(str(movie["year"]))
-    bits.append(f"{kind}推荐")
-    tags = "、".join((movie.get("tags") or [])[:4])
-    if tags:
-        bits.append(tags)
-    if movie.get("director"):
-        bits.append("导演" + movie["director"])
-    if movie.get("rate"):
-        bits.append("豆瓣" + str(movie["rate"]))
-    bits.append(f"入选{n_lists}个片单")
-    syn = (movie.get("syn") or "").strip()
-    text = "，".join(bits) + "。" + syn
-    text += "用来看它还出现在哪些高分片单里，不是播放页。"
-    return clip_desc(text)
+def desc_movie(movie, n_lists: int, list_names: list | None = None) -> str:
+    return clip_desc(movie_blurb(movie, n_lists, list_names))
 
 
 def write(path: Path, text: str):
@@ -769,7 +808,15 @@ def render_hub(data, cat_id: str) -> str:
 def render_list(lst, data) -> str:
     cat = data["cat_by"].get(lst.get("category"))
     movies = [data["movie_by"][mid] for mid in lst.get("movies") or [] if mid in data["movie_by"]]
-    items = "".join(movie_item(m, i + 1) for i, m in enumerate(movies))
+    items = "".join(
+        movie_item(
+            m,
+            i + 1,
+            data["movie_list_n"].get(m["id"], 0),
+            [l.get("name") for l in data["lists_by_movie"].get(m["id"], [])],
+        )
+        for i, m in enumerate(movies)
+    )
     toc = "".join(f'<a href="#m{i+1}">{i+1}. {esc(m.get("title"))}</a>' for i, m in enumerate(movies))
     cat_name = cat["name"] if cat else ""
     cross = list_cross(lst, movies, data)
@@ -832,6 +879,7 @@ def render_list(lst, data) -> str:
 def render_movie(movie, data) -> str:
     graph = movie_graph(movie, data)
     memberships = graph["memberships"]
+    list_names = [l.get("name") for l in memberships]
     grouped = []
     used = set()
     for cat in data["categories"]:
@@ -845,11 +893,6 @@ def render_movie(movie, data) -> str:
     tags = [movie.get("year"), movie.get("region"), *(movie.get("tags") or [])]
     tags = [t for t in tags if t]
     max_shared = graph["neighbors"][0]["shared_count"] if graph["neighbors"] else 0
-    syn = (movie.get("syn") or "").strip()
-    syn_block = ""
-    if syn:
-        more = '<span class="toggle-syn" id="toggleSyn">展开全部 ▾</span>' if len(syn) > 80 else ""
-        syn_block = f'<p class="syn" id="syn">{esc(syn)}</p>{more}'
     reason_block = ""
     if graph["reasons"]:
         cards = []
@@ -921,7 +964,6 @@ def render_movie(movie, data) -> str:
     tag_html = "".join(f'<span class="tag">{esc(t)}</span>' for t in tags)
     if movie.get("badge"):
         tag_html += f'<span class="tag">{esc(movie["badge"])}</span>'
-    series = " - 连载中" if (movie.get("episodes") or 0) > 0 else ""
     count = movie.get("count") or ""
     max_html = f'<div class="graph-stat"><b>{max_shared}</b><span>最高同框数</span></div>' if max_shared else ""
     body = f'''<div class="wrap" id="detailRoot">
@@ -940,10 +982,10 @@ def render_movie(movie, data) -> str:
         <div class="meta-row"><b>导演</b><span>{esc(movie.get("director") or "—")}</span></div>
         <div class="meta-row"><b>主演</b><span>{esc(" / ".join(movie.get("actors") or []) or "—")}</span></div>
         <div class="meta-row"><b>类型</b><span>{esc(" · ".join(movie.get("tags") or []) or "—")}</span></div>
-        <div class="meta-row"><b>年份</b><span>{esc(movie.get("year") or "—")}{series}</span></div>
-        {syn_block}
+        <div class="meta-row"><b>年份</b><span>{esc(movie.get("year") or "—")}</span></div>
       </div>
     </div>
+    <div class="block movie-intro"><h2>{esc(movie_kind(movie, list_names))}简介</h2><p>{esc(movie_blurb(movie, len(memberships), list_names))}</p></div>
     {reason_block}
     {order_block}
     {list_block}
@@ -952,8 +994,8 @@ def render_movie(movie, data) -> str:
 </div>'''
     actors = movie.get("actors") or []
     return page_doc(
-        title=movie_page_title(movie, len(memberships)),
-        description=desc_movie(movie, len(memberships)),
+        title=movie_page_title(movie, len(memberships), list_names),
+        description=desc_movie(movie, len(memberships), list_names),
         nested=True,
         page="",
         body=body,
@@ -963,10 +1005,10 @@ def render_movie(movie, data) -> str:
             movie.get("director"),
             *actors[:2],
             *(movie.get("tags") or [])[:4],
-            f"{movie_kind(movie)}推荐",
+            f"{movie_kind(movie, list_names)}推荐",
             SITE,
         ),
-        json_ld=movie_json_ld(movie),
+        json_ld=movie_json_ld(movie, list_names),
         path=movie_url(movie["id"]),
         image=public_cover(movie.get("cover") or "") or "",
     )
