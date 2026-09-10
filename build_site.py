@@ -231,34 +231,13 @@ def list_cross(lst: dict, movies: list, data: dict) -> dict:
 
 def list_lead(lst: dict, movies: list, cat_name: str, cross: dict | None = None) -> str:
     name = lst.get("name") or "这份片单"
-    films = sum(1 for m in movies if not (m.get("episodes") or 0))
-    series = len(movies) - films
-    years = sorted({int(m["year"]) for m in movies if str(m.get("year") or "").isdigit()})
-    rates = [rate_num(m) for m in movies if rate_num(m)]
-    bits = [f"「{name}」在本站归在{cat_name or '片单'}类。页面按名单原顺序对照 {len(movies)} 部，不改名次。"]
-    if films and series:
-        bits.append(f"其中电影 {films} 部、剧集 {series} 部。")
-    elif films:
-        bits.append("这一页主要是电影。")
-    elif series:
-        bits.append("这一页主要是剧集。")
-    if years:
-        bits.append(f"年份从 {years[0]} 年到 {years[-1]} 年。")
-    if rates:
-        bits.append(f"有评分的条目平均豆瓣 {sum(rates) / len(rates):.1f}。")
+    n = len(movies)
     if cross:
-        bits.append(f"其中 {len(cross['only'])} 部只出现在这份名单，{len(cross['shared'])} 部还能在其它名单里找到。")
-        if cross["neighbors"]:
-            names = "、".join(f'{item[0]["name"]}（重叠{item[1]}部）' for item in cross["neighbors"][:3])
-            bits.append("重叠最多的其它名单是" + names + "。")
-        if cross["shared"]:
-            bits.append(
-                "跨名单最多的是"
-                + "、".join(f'{movie.get("title")}（{count}份）' for movie, count in cross["shared"][:3])
-                + "。"
-            )
-    bits.append("本页只做对照，不转载影评，也不提供播放。")
-    return "".join(bits)
+        return (
+            f"「{name}」按原名单顺序对照 {n} 部。"
+            f"{len(cross['only'])} 部只在这份名单，{len(cross['shared'])} 部还出现在其它名单。"
+        )
+    return f"「{name}」按原名单顺序对照 {n} 部。"
 
 
 def abs_url(path: str) -> str:
@@ -781,7 +760,6 @@ def render_list(lst, data) -> str:
     body = f'''<div class="wrap">
   <div class="crumb"><a href="/index.html">首页</a><span class="sep">/</span><a href="/lists.html">全部片单</a><span class="sep">/</span><span>{esc(lst.get("name"))}</span></div>
   <h1 class="page-title">{esc(lst.get("name"))} · 交叉对照 <span class="cat-tag">{esc(cat_name)}</span></h1>
-  <p class="list-lead">{esc(lead)}</p>
   {stats}
   {overlap_block}
   <div class="filter-bar" id="filterBar">
