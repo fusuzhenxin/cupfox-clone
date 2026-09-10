@@ -20,16 +20,16 @@ from urllib.parse import unquote, urljoin
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data.jsonl"
-SITE = "片单对照"
+SITE = "茶杯狐"
 TAGLINE = "看一部片还在哪些名单里"
 ORIGIN = "https://www.cupfox.xin"
 HOME_TITLE = f"{SITE} · 公开片单的交叉索引"
 HOME_DESCRIPTION = (
-    "片单对照把多份公开名单叠在一起：一部作品同时出现在哪些名单、"
+    "茶杯狐把多份公开名单叠在一起：一部作品同时出现在哪些名单、"
     "和哪几部共享最多名单、系列该按什么顺序看。不转载影评，不提供播放。"
 )
 BUILD_DATE = date.today().isoformat()
-ASSET_V = "20260910d"
+ASSET_V = "20260910e"
 HUB_BLURBS = {
     "featured": "这里是全部公开片单的入口。每份名单页会写出它和其它名单重叠了多少，而不是复述原名单的宣传语。",
     "region": "按出品地和形式归类的名单。同一部作品常常同时出现在地区名单和类型名单里，重叠关系在各名单页里。",
@@ -294,16 +294,23 @@ def movie_item(movie: dict, num: int) -> str:
   </div>'''
 
 
+def brand_logo(size: int = 32, link: bool = True) -> str:
+    inner = (
+        f'<img src="/logo.png" width="{size}" height="{size}" alt="">'
+        f'<span><span class="brand-c">Cupfox</span> {SITE}</span>'
+    )
+    if link:
+        return f'<a class="logo" href="/index.html" aria-label="{SITE}">{inner}</a>'
+    return f'<div class="logo" style="font-size:20px;margin-bottom:10px">{inner}</div>'
+
+
 def nav_html(page: str) -> str:
     links = "".join(
         f'<a href="{href}" data-p="{key}" class="{"active" if page == key else ""}">{label}</a>'
         for key, href, label in NAV_LINKS
     )
     return f'''<nav class="nav"><div class="wrap nav-in">
-  <a class="logo" href="/index.html" aria-label="{SITE}">
-    <span class="logo-mark">对</span>
-    <span>{SITE}</span>
-  </a>
+  {brand_logo()}
   <div class="nav-links">{links}</div>
   <div class="nav-right">
     <button class="icon-btn" id="searchBtn" aria-label="搜索"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
@@ -316,8 +323,8 @@ def foot_html() -> str:
     return f'''<footer>
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <div class="logo" style="font-size:20px;margin-bottom:10px"><span class="logo-mark">对</span><span>{SITE}</span></div>
-      <p class="foot-desc">独立片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
+      {brand_logo(28, link=False)}
+      <p class="foot-desc">茶杯狐做片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
       <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p>
     </div>
     <div class="foot-col">
@@ -335,7 +342,7 @@ def foot_html() -> str:
       <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
-  <div class="wrap"><div class="copy">© {SITE} · 交叉索引 · 不提供在线播放</div></div>
+  <div class="wrap"><div class="copy">© Cupfox {SITE} · 交叉索引 · 不提供在线播放</div></div>
 </footer>'''
 
 
@@ -387,6 +394,8 @@ def page_doc(
 {og_img}
 {canon}
 <link rel="icon" href="/favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="/logo.png"/>
+<link rel="apple-touch-icon" href="/logo.png"/>
 <link rel="stylesheet" href="/styles.css?v={ASSET_V}"/>
 {extra_head}
 {ld}
@@ -936,7 +945,7 @@ def render_method(data) -> str:
     body = f'''<div class="wrap">
   <article class="page-doc">
     <h1>交叉怎么算</h1>
-    <p class="lead">片单对照只发布自己算出来的重叠关系，不转载其它站点的盘点正文和海报。</p>
+    <p class="lead">茶杯狐只发布自己算出来的重叠关系，不转载其它站点的盘点正文和海报。</p>
     <h2 id="source">用了哪些名单</h2>
     <p>数据层是公开片单的标题、顺序和作品字段：片名、年份、导演、主演、豆瓣评分。目前共 {n_lists} 份名单、{n_movies} 部作品。名单名称来自各自的公开出处，本站不改名次，也不另写影评。</p>
     <h2 id="overlap">重叠</h2>
@@ -952,7 +961,7 @@ def render_method(data) -> str:
 </div>'''
     return page_doc(
         title=f"交叉怎么算 - {SITE}",
-        description="说明片单对照如何计算名单重叠、独有条目和观看顺序，以及哪些页面不向搜索引擎要求收录。",
+        description="说明茶杯狐如何计算名单重叠、独有条目和观看顺序，以及哪些页面不向搜索引擎要求收录。",
         nested=False,
         page="method",
         body=body,
@@ -972,7 +981,7 @@ ABOUT_BODY = '''<div class="wrap">
   <article class="page-doc">
     <h1>关于与联系</h1>
     <p class="lead">独立片单交叉索引，不是播放站，也不转载其它导航站的盘点文章。</p>
-    <h2 id="about">关于片单对照</h2>
+    <h2 id="about">关于茶杯狐</h2>
     <p>本站把公开片单做成可检索的交叉索引：一部作品同时出现在哪些名单里、和哪几部共享最多名单、系列该按什么顺序看。「今晚看什么」只在现有名单里抽三部。</p>
     <p>没有账号，也不提供在线播放。评分和片名来自各自的公开来源。卡片图由本站按标题生成，不热链其它站点的海报。影片详情只用来看交叉，不向搜索引擎要求收录。</p>
     <h2 id="copyright">版权声明</h2>
@@ -1086,7 +1095,7 @@ def main():
         ROOT / "about.html",
         page_doc(
             title=f"关于与联系 - {SITE}",
-            description="片单对照的介绍、版权声明、联系邮箱与侵权投诉方式。本站做交叉索引，不转载盘点文章，不提供在线播放。",
+            description="茶杯狐的介绍、版权声明、联系邮箱与侵权投诉方式。本站做交叉索引，不转载盘点文章，不提供在线播放。",
             keywords=seo_keywords(SITE, "关于", "版权声明"),
             nested=False,
             page="",

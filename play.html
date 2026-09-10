@@ -4,12 +4,12 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="google" content="notranslate"/>
-<title>播放 - 片单对照</title>
+<title>播放 - 茶杯狐</title>
 <meta name="robots" content="noindex,follow"/>
 <link rel="icon" href="favicon.ico" sizes="any"/>
 <link rel="icon" type="image/png" href="logo.png"/>
 <link rel="apple-touch-icon" href="logo.png"/>
-<link rel="stylesheet" href="styles.css?v=20260910d"/>
+<link rel="stylesheet" href="styles.css?v=20260910e"/>
 </head>
 <body>
 <div id="nav"></div>
@@ -32,13 +32,13 @@
 </div>
 <div id="foot"></div>
 <script>window.PAGE='lists';</script>
-<script src="app.js?v=20260910d"></script>
+<script src="app.js?v=20260910e"></script>
 <script>
 Cupfox.loadData().then(d=>{
   const id=Cupfox.param('movie'), ep=Cupfox.param('ep'), src=Cupfox.param('src');
   const m=d.movieById[id];
   if(!m){ document.getElementById('playRoot').innerHTML='<div class="empty">未找到该影片</div>'; return; }
-  document.title=`播放 ${m.title} - 片单对照`;
+  document.title=`播放 ${m.title} - 茶杯狐`;
   document.getElementById('crumbName').textContent=m.title;
   document.getElementById('back').href=Cupfox.detailUrl(id);
   const label = ep?`第 ${ep} 集` : (src?`播放源 0${src}` : '正片');

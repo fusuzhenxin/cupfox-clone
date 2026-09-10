@@ -1,4 +1,4 @@
-/* ===== 片单对照 · 共享脚本 ===== */
+/* ===== 茶杯狐 · 共享脚本 ===== */
 'use strict';
 
 const PALETTES = [
@@ -101,9 +101,9 @@ function phFor(obj, w, h, kind){
 }
 
 /* ---------- 导航 / 页脚 / 搜索弹窗 ---------- */
-const LOGO = `<a class="logo" href="/index.html" aria-label="片单对照">
-  <span class="logo-mark">对</span>
-  <span>片单对照</span>
+const LOGO = `<a class="logo" href="/index.html" aria-label="茶杯狐">
+  <img src="/logo.png" width="32" height="32" alt="">
+  <span><span class="brand-c">Cupfox</span> 茶杯狐</span>
 </a>`;
 
 const NAV = `<nav class="nav"><div class="wrap nav-in">
@@ -122,8 +122,8 @@ const NAV = `<nav class="nav"><div class="wrap nav-in">
 const FOOT = `<footer>
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <div class="logo" style="font-size:20px;margin-bottom:10px"><span class="logo-mark">对</span><span>片单对照</span></div>
-      <p class="foot-desc">独立片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
+      <div class="logo" style="font-size:20px;margin-bottom:10px"><img src="/logo.png" width="28" height="28" alt=""><span><span class="brand-c">Cupfox</span> 茶杯狐</span></div>
+      <p class="foot-desc">茶杯狐做片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
       <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p>
     </div>
     <div class="foot-col">
@@ -141,7 +141,7 @@ const FOOT = `<footer>
       <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
-  <div class="wrap"><div class="copy">© 片单对照 · 交叉索引 · 不提供在线播放</div></div>
+  <div class="wrap"><div class="copy">© Cupfox 茶杯狐 · 交叉索引 · 不提供在线播放</div></div>
 </footer>`;
 
 const MODAL = `<div class="modal" id="modal"><div class="search-box">
