@@ -85,17 +85,35 @@ def hash_hue(text: str) -> int:
     return h % 360
 
 
+POSTER_BG = (
+    "linear-gradient(135deg,#3d6cb9,#152238)",
+    "linear-gradient(135deg,#7a3d9e,#1a1228)",
+    "linear-gradient(135deg,#2a7a6e,#10201c)",
+    "linear-gradient(135deg,#b05a2a,#231610)",
+    "linear-gradient(135deg,#3a7a9e,#101820)",
+    "linear-gradient(135deg,#8a3d5c,#1c1014)",
+    "linear-gradient(135deg,#4a6a2a,#14180e)",
+    "linear-gradient(135deg,#2a4a8a,#0e1424)",
+    "linear-gradient(135deg,#8a6a2a,#1c180e)",
+    "linear-gradient(135deg,#5a3d8a,#161020)",
+)
+
+
+def poster_bg(obj: dict) -> str:
+    key = obj.get("id") or obj.get("title") or obj.get("name") or "x"
+    return POSTER_BG[hash_hue(key) % len(POSTER_BG)]
+
+
 def public_cover(url: str) -> str:
     return url if is_img(url) else ""
 
 
 def poster_block(obj: dict, alt: str = "", cls: str = "ph gen-ph") -> str:
     title = alt or obj.get("title") or obj.get("name") or ""
-    hue = hash_hue(obj.get("id") or title)
     rate = obj.get("rate") or ""
     extra = f"<em>{esc(rate)}</em>" if rate else ""
     return (
-        f'<div class="{cls}" style="--h:{hue}" role="img" aria-label="{esc(title)}">'
+        f'<div class="{cls}" style="background:{poster_bg(obj)}" role="img" aria-label="{esc(title)}">'
         f"<span>{esc(title)}</span>{extra}</div>"
     )
 
@@ -369,10 +387,11 @@ def page_doc(
         ld = "<script type=\"application/ld+json\">" + json.dumps(json_ld, ensure_ascii=False).replace("<", "\\u003c") + "</script>"
     cls = f' class="{body_class}"' if body_class else ""
     return f'''<!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" translate="no">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="google" content="notranslate"/>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(clip_desc(description))}"/>
 {key_tag}
@@ -625,12 +644,10 @@ def write(path: Path, text: str):
 
 def render_index(data) -> str:
     home_cats = [c for c in data["categories"] if c["id"] != "featured"]
-    cat_tiles = []
-    for cat in home_cats:
-        cat_tiles.append(
-            f'<a class="cat" href="{esc(cat_url(cat["id"]))}">{poster_block(cat)}'
-            f'<b>{esc(cat["name"])}</b></a>'
-        )
+    cat_links = "".join(
+        f'<a class="cat-link" href="{esc(cat_url(cat["id"]))}">{esc(cat["name"])}</a>'
+        for cat in home_cats
+    )
     crossed = []
     for movie in data.get("top_crossed") or []:
         n = data["movie_list_n"].get(movie["id"], 0)
@@ -640,14 +657,14 @@ def render_index(data) -> str:
             f"<span>出现在 {n} 份片单</span></div></a>"
         )
     sections = [
-        '''<section id="tonight">
-      <div class="sec-head"><div class="sec-title">今晚看什么</div></div>
-      <p class="tonight-empty">点任意一个标签，从现有名单里抽三部。</p>
-    </section>''',
         f'''<section>
       <div class="sec-head"><div class="sec-title">交叉最多的作品</div><a class="btn-sm" href="/method.html">怎么算的</a></div>
       <p class="home-note">按「同时出现在几份名单」排序，不是热搜，也不是转载盘点。</p>
       <div class="cross-hits">{"".join(crossed)}</div>
+    </section>''',
+        '''<section id="tonight">
+      <div class="sec-head"><div class="sec-title">今晚看什么</div></div>
+      <p class="tonight-empty">点任意一个标签，从现有名单里抽三部。</p>
     </section>''',
     ]
     for cat in home_cats:
@@ -673,7 +690,7 @@ def render_index(data) -> str:
       <div><b>{n_movies}</b><span>部对照作品</span></div>
       <div><b>{n_multi}</b><span>部出现在 3 份以上名单</span></div>
     </div>
-    <div class="hero-cats" id="heroCats">{"".join(cat_tiles)}</div>
+    <div class="hero-links">{cat_links}</div>
   </div>
 </section>
 <main class="wrap" id="cats">
