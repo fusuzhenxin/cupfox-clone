@@ -4,5 +4,7 @@ Disallow: /play.html
 Disallow: /detail.html
 Disallow: /list.html
 Disallow: /post.html
+Disallow: /post/
+Disallow: /movie/
 
 Sitemap: https://www.cupfox.xin/sitemap.xml

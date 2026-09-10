@@ -1,4 +1,4 @@
-/* ===== 茶杯狐克隆 · 共享脚本（数据驱动 + 全功能） ===== */
+/* ===== 片单对照 · 共享脚本 ===== */
 'use strict';
 
 const PALETTES = [
@@ -52,7 +52,7 @@ function posterSvg(m, w=300, h=450){
     <line x1="${w*0.12}" y1="${h*0.66}" x2="${w*0.88}" y2="${h*0.66}" stroke="#fff" stroke-opacity="0.08" stroke-width="1"/>
     ${textEls}
     <text x="${w/2}" y="${h*0.75}" text-anchor="middle" fill="#aaa" font-size="${Math.max(11,w*0.042)}" font-family="PingFang SC, Microsoft YaHei, sans-serif">${sub}</text>
-    <text x="${w-14}" y="34" text-anchor="end" fill="#ff705b" font-size="22" font-weight="800" font-family="Arial, sans-serif">${rate}</text>
+    <text x="${w-14}" y="34" text-anchor="end" fill="#4c8dff" font-size="22" font-weight="800" font-family="Arial, sans-serif">${rate}</text>
   </svg>`;
   return svgURI(svg);
 }
@@ -88,7 +88,13 @@ function collageHtml(list, cls='ph'){
 }
 
 /* ---------- 真实图片优先，SVG 兜底 ---------- */
-function isImg(s){ return typeof s==='string' && /^https?:\/\//i.test(s); }
+function isSourceHost(url){
+  try{
+    const host=new URL(url).hostname;
+    return /(^|\.)(cupfox\.love|zhimg\.com|zhihu\.com|biliimg\.com)$/i.test(host);
+  }catch(e){ return true; }
+}
+function isImg(s){ return typeof s==='string' && /^https?:\/\//i.test(s) && !isSourceHost(s); }
 function phFor(obj, w, h, kind){
   const cover = obj && obj.cover;
   if(isImg(cover)){
@@ -99,90 +105,51 @@ function phFor(obj, w, h, kind){
 }
 
 /* ---------- 导航 / 页脚 / 搜索弹窗 ---------- */
-const LOGO = `<a class="logo" href="index.html" aria-label="茶杯狐">
-  <img src="logo.png" width="32" height="32" alt="">
-  <span><span style="color:#ff705b;font-weight:900">Cupfox</span> 茶杯狐</span>
+const LOGO = `<a class="logo" href="/index.html" aria-label="片单对照">
+  <span class="logo-mark">对</span>
+  <span>片单对照</span>
 </a>`;
 
 const NAV = `<nav class="nav"><div class="wrap nav-in">
   ${LOGO}
   <div class="nav-links">
-    <a href="index.html" data-p="home">首页</a>
-    <a href="lists.html" data-p="lists">片单</a>
-    <a href="posts.html" data-p="posts">文章</a>
+    <a href="/index.html" data-p="home">首页</a>
+    <a href="/lists.html" data-p="lists">片单</a>
+    <a href="/method.html" data-p="method">方法</a>
   </div>
   <div class="nav-right">
     <button class="icon-btn" id="searchBtn" aria-label="搜索"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
     <button class="toggle" id="themeBtn" aria-label="切换主题"><span class="dot"></span></button>
   </div>
-</nav>`;
+</div></nav>`;
 
 const FOOT = `<footer>
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <div class="logo" style="font-size:20px;margin-bottom:10px"><img src="logo.png" width="28" height="28" alt="茶杯狐"><span><span style="color:#ff705b;font-weight:900">Cupfox</span> 茶杯狐</span></div>
-      <p class="foot-desc">茶杯狐是电影电视剧推荐与高分片单导航站。收录豆瓣高分、IMDB 高分、奥斯卡最佳影片、国产剧、美剧、日剧、韩剧、动漫和纪录片名单，按类型、导演、演员和观看顺序帮你解决片荒、挑今晚看什么。本站展示公开片单与编辑文章，不提供在线播放。</p>
+      <div class="logo" style="font-size:20px;margin-bottom:10px"><span class="logo-mark">对</span><span>片单对照</span></div>
+      <p class="foot-desc">独立片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
       <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p>
     </div>
     <div class="foot-col">
-      <h3>热门分类</h3>
-      <a href="lists.html">精选片单</a>
-      <a href="cat/genre.html">类型题材</a>
-      <a href="cat/region.html">国产剧 / 美剧 / 日韩</a>
-      <a href="cat/award.html">奥斯卡获奖作品</a>
-      <a href="cat/order.html">系列观看顺序</a>
-      <a href="cat/director.html">导演代表作</a>
-      <a href="cat/actor.html">演员代表作</a>
-      <a href="posts.html">影视盘点文章</a>
+      <h3>浏览</h3>
+      <a href="/lists.html">全部片单</a>
+      <a href="/cat/order.html">观看顺序</a>
+      <a href="/cat/award.html">获奖作品</a>
+      <a href="/method.html">方法</a>
     </div>
     <div class="foot-col">
-      <h3>高分片单</h3>
-      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a>
-      <a href="list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a>
-      <a href="list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a>
-      <a href="list/list-豆瓣高分日剧推荐.html">豆瓣高分日剧</a>
-      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分欧美剧</a>
-      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a>
-      <a href="list/list-经典悬疑电影推荐.html">悬疑电影推荐</a>
-      <a href="list/list-经典科幻电影推荐.html">科幻电影推荐</a>
-    </div>
-    <div class="foot-col">
-      <h3>站点与帮助</h3>
-      <a href="index.html">首页 · 今晚看什么</a>
-      <a href="about.html#about">关于茶杯狐</a>
-      <a href="about.html#copyright">版权声明</a>
-      <a href="about.html#contact">联系我们</a>
-      <a href="about.html#complaint">侵权投诉</a>
-      <a href="about.html#help">帮助反馈</a>
+      <h3>站点</h3>
+      <a href="/about.html#about">关于</a>
+      <a href="/about.html#copyright">版权声明</a>
+      <a href="/about.html#contact">联系</a>
+      <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
-  <div class="wrap">
-    <div class="foot-keys" aria-label="热门搜索">
-      <a href="index.html">电影推荐</a>
-      <a href="index.html">电视剧推荐</a>
-      <a href="index.html">今晚看什么</a>
-      <a href="lists.html">高分片单</a>
-      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分</a>
-      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分</a>
-      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡</a>
-      <a href="list/list-大陆经典电影推荐.html">国产电影</a>
-      <a href="list/list-经典动作电影推荐.html">动作电影</a>
-      <a href="list/list-经典喜剧电影推荐.html">喜剧电影</a>
-      <a href="list/list-经典爱情电影推荐.html">爱情电影</a>
-      <a href="list/list-经典恐怖电影推荐.html">恐怖电影</a>
-      <a href="list/list-经典动画电影推荐.html">动画电影</a>
-      <a href="list/list-经典纪录片电影推荐.html">纪录片</a>
-      <a href="list/list-豆瓣高分国漫推荐.html">国漫推荐</a>
-      <a href="list/list-豆瓣高分日漫推荐.html">日漫推荐</a>
-      <a href="cat/order.html">观看顺序</a>
-      <a href="posts.html">影视盘点</a>
-    </div>
-    <div class="copy">© Cupfox 茶杯狐 · 公开影视片单与文章的本地归档展示 · 电影推荐 / 电视剧推荐 / 高分片单 · 不提供在线播放</div>
-  </div>
+  <div class="wrap"><div class="copy">© 片单对照 · 交叉索引 · 不提供在线播放</div></div>
 </footer>`;
 
 const MODAL = `<div class="modal" id="modal"><div class="search-box">
-  <input id="searchInput" placeholder="搜索电影推荐、电视剧、演员、导演、高分片单…" autocomplete="off" />
+  <input id="searchInput" placeholder="搜索影片、导演、演员或片单…" autocomplete="off" />
   <div class="hot"><span>豆瓣高分</span><span>奥斯卡</span><span>国产剧</span><span>美剧</span><span>韩剧</span><span>悬疑电影</span><span>科幻电影</span><span>日漫</span><span>宫崎骏</span></div>
   <div class="results" id="searchResults"></div>
 </div></div>`;
@@ -198,12 +165,7 @@ let _dataPromise = null;
 let _dataCache = null;
 function loadData(){
   if(_dataPromise) return _dataPromise;
-  let url='data.jsonl';
-  try{
-    const base=document.querySelector('base');
-    if(base && base.href) url=new URL('data.jsonl', base.href).toString();
-  }catch(e){}
-  _dataPromise = fetch(url).then(r=>{
+  _dataPromise = fetch('/data.jsonl').then(r=>{
     if(!r.ok) throw new Error('data.jsonl 加载失败: '+r.status);
     return r.text();
   }).then(text=>{
@@ -288,10 +250,6 @@ function graphHops(memberships, articles){
   addList((byCat.order||[])[0], 'order', '观看顺序，下一跳按名单走。');
   addList((byCat.actor||[])[0]||(byCat.director||[])[0], 'person', '人物片单，适合接着看同一人的其它作品。');
   addList((byCat.subgenre||[])[0]||(byCat.genre||[])[0]||(byCat.style||[])[0], 'topic', '题材片单，沿这条口味继续找。');
-  if(articles[0]){
-    const article={ kind:'post', title:articles[0].title, href:postUrl(articles[0].id), desc:'站内文章提到了这部片。' };
-    return hops.slice(0,2).concat(article);
-  }
   return hops.slice(0,3);
 }
 
@@ -395,10 +353,10 @@ function fileSlug(id){
   return text.replace(/[<>:"/\\|?*]+/g,'-').replace(/[. ]+$/,'').slice(0,120)||'item';
 }
 function param(name){ return new URLSearchParams(location.search).get(name); }
-const listUrl  = id => `list/${fileSlug(id)}.html`;
-const detailUrl= id => `movie/${fileSlug(id)}.html`;
-const postUrl  = id => `post/${fileSlug(id)}.html`;
-const catUrl   = id => id==='featured' ? 'lists.html' : `cat/${fileSlug(id)}.html`;
+const listUrl  = id => `/list/${fileSlug(id)}.html`;
+const detailUrl= id => `/movie/${fileSlug(id)}.html`;
+const postUrl  = id => `/post/${fileSlug(id)}.html`;
+const catUrl   = id => id==='featured' ? '/lists.html' : `/cat/${fileSlug(id)}.html`;
 
 /* ---------- 渲染 helper ---------- */
 function card(title, obj, href, opts={}){
@@ -466,11 +424,10 @@ function renderSearch(q, data){
   const box=document.getElementById('searchResults');
   if(!box) return;
   if(!q.trim()){ box.innerHTML=''; return; }
-  const {movies,lists,posts}=runSearch(q,data);
+  const {movies,lists}=runSearch(q,data);
   let html='';
   if(movies.length){ html+='<div class="res-group"><span class="res-k">影片</span>'+movies.map(m=>`<a class="res" href="${detailUrl(m.id)}">${m.title} <em>${m.rate||''}</em></a>`).join('')+'</div>'; }
   if(lists.length){ html+='<div class="res-group"><span class="res-k">片单</span>'+lists.map(l=>`<a class="res" href="${listUrl(l.id)}">${l.name}</a>`).join('')+'</div>'; }
-  if(posts.length){ html+='<div class="res-group"><span class="res-k">文章</span>'+posts.map(p=>`<a class="res" href="${postUrl(p.id)}">${p.title}</a>`).join('')+'</div>'; }
   box.innerHTML = html || '<div class="res-empty">没有找到相关结果</div>';
   box.querySelectorAll('a.res').forEach(a=>a.addEventListener('click',()=>closeModal()));
 }

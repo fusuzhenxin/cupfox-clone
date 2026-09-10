@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>播放 - 茶杯狐</title>
+<title>播放 - 片单对照</title>
 <meta name="robots" content="noindex,follow"/>
 <link rel="icon" href="favicon.ico" sizes="any"/>
 <link rel="icon" type="image/png" href="logo.png"/>
@@ -37,7 +37,7 @@ Cupfox.loadData().then(d=>{
   const id=Cupfox.param('movie'), ep=Cupfox.param('ep'), src=Cupfox.param('src');
   const m=d.movieById[id];
   if(!m){ document.getElementById('playRoot').innerHTML='<div class="empty">未找到该影片</div>'; return; }
-  document.title=`播放 ${m.title} - 茶杯狐`;
+  document.title=`播放 ${m.title} - 片单对照`;
   document.getElementById('crumbName').textContent=m.title;
   document.getElementById('back').href=Cupfox.detailUrl(id);
   const label = ep?`第 ${ep} 集` : (src?`播放源 0${src}` : '正片');

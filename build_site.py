@@ -13,39 +13,37 @@ import html
 import json
 import re
 import shutil
-from collections import defaultdict
+from collections import Counter, defaultdict
+from datetime import date
 from pathlib import Path
-from urllib.parse import unquote, urljoin
+from urllib.parse import unquote, urljoin, urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data.jsonl"
-SITE = "茶杯狐"
-TAGLINE = "片荒剧荒就来茶杯狐"
+SITE = "片单对照"
+TAGLINE = "看一部片还在哪些名单里"
 ORIGIN = "https://www.cupfox.xin"
-SITE_KEYWORDS = (
-    "茶杯狐,Cupfox,电影推荐,电视剧推荐,高分电影,豆瓣高分,IMDB高分,"
-    "奥斯卡最佳影片,今晚看什么,片单,片荒,国产剧,美剧推荐,日剧,韩剧,"
-    "动漫推荐,纪录片,悬疑电影,科幻电影,经典电影,观看顺序"
-)
-HOME_TITLE = f"{SITE} - 电影电视剧推荐与高分片单 | {TAGLINE}"
+HOME_TITLE = f"{SITE} · 公开片单的交叉索引"
 HOME_DESCRIPTION = (
-    "茶杯狐是电影电视剧推荐与高分片单站。收录豆瓣高分、IMDB、奥斯卡最佳影片、"
-    "国产剧、美剧、日剧、韩剧、动漫和纪录片名单，按类型、导演、演员和观看顺序挑片，解决片荒。不提供在线播放。"
+    "片单对照把多份公开名单叠在一起：一部作品同时出现在哪些名单、"
+    "和哪几部共享最多名单、系列该按什么顺序看。不转载影评，不提供播放。"
 )
+BUILD_DATE = date.today().isoformat()
+SOURCE_IMAGE_HOSTS = ("cupfox.love", "zhimg.com", "zhihu.com", "biliimg.com")
 HUB_BLURBS = {
-    "featured": "精选电影电视剧片单，覆盖豆瓣高分、IMDB、奥斯卡、类型题材与观看顺序。",
-    "region": "按地区与形式挑片：国产剧、美剧、日剧、韩剧、港剧、台剧、纪录片和动漫。",
-    "genre": "按类型挑电影：动作、喜剧、科幻、悬疑、爱情、恐怖、动画、战争、犯罪。",
-    "subgenre": "更细的口味片单：功夫、公路、青春校园、美食、穿越、监狱、机器人。",
-    "style": "按风格找片：暴力美学、哥特、废土、表现主义、新现实主义。",
-    "order": "系列观看顺序：漫威、DC、名侦探柯南等，先看哪一部不用猜。",
-    "award": "奥斯卡最佳影片、最佳导演、最佳演员等获奖作品名单。",
-    "pro": "AFI、Letterboxd 等专业评选片单，按共识挑高分电影。",
-    "director": "导演代表作片单，从导演入口走进他们最值得看的作品。",
-    "actor": "演员代表作片单，按主演找下一部值得看的电影电视剧。",
+    "featured": "这里是全部公开片单的入口。每份名单页会写出它和其它名单重叠了多少，而不是复述原名单的宣传语。",
+    "region": "按出品地和形式归类的名单。同一部作品常常同时出现在地区名单和类型名单里，重叠关系在各名单页里。",
+    "genre": "按类型归类的名单。类型名只用来分堆，判断一部片值不值得看，要看它还进了哪些专业或获奖名单。",
+    "subgenre": "更细的题材名单。和类型名单叠在一起时，可以看出一部片是「只在细类里」还是「细类和主类都有」。",
+    "style": "按风格归类的名单。风格标签主观，所以本页只提供对照，不把风格写成推荐理由。",
+    "order": "系列观看顺序名单。详情里按原名单给出上一跳和下一跳，不另编一套顺序。",
+    "award": "颁奖结果名单。和专业评选名单重叠时，比单独看一座奖杯更能说明反复出现的原因。",
+    "pro": "影史和影评人评选名单。本站关心的是一份名单和另一份名单叠了多少，而不是再抄一份榜单前言。",
+    "director": "导演作品名单。用来从导演走进交叉，再看同一人还出现在哪些类型或获奖名单。",
+    "actor": "演员作品名单。用法和导演名单一样：当人物入口，不代替片单原文。",
 }
 
-NAV_LINKS = (("home", "index.html", "首页"), ("lists", "lists.html", "片单"), ("posts", "posts.html", "文章"))
+NAV_LINKS = (("home", "/index.html", "首页"), ("lists", "/lists.html", "片单"), ("method", "/method.html", "方法"))
 
 
 def esc(value) -> str:
@@ -74,7 +72,43 @@ def file_slug(item_id: str) -> str:
 
 
 def is_img(url: str) -> bool:
-    return isinstance(url, str) and url.lower().startswith(("http://", "https://"))
+    if not (isinstance(url, str) and url.lower().startswith(("http://", "https://"))):
+        return False
+    host = urlparse(url).netloc.lower()
+    return not any(src in host for src in SOURCE_IMAGE_HOSTS)
+
+
+def hash_hue(text: str) -> int:
+    h = 0
+    for ch in str(text or "x"):
+        h = (h * 31 + ord(ch)) & 0xFFFFFF
+    return h % 360
+
+
+def public_cover(url: str) -> str:
+    return url if is_img(url) else ""
+
+
+def poster_block(obj: dict, alt: str = "", cls: str = "ph gen-ph") -> str:
+    title = alt or obj.get("title") or obj.get("name") or ""
+    hue = hash_hue(obj.get("id") or title)
+    rate = obj.get("rate") or ""
+    extra = f"<em>{esc(rate)}</em>" if rate else ""
+    return (
+        f'<div class="{cls}" style="--h:{hue}" role="img" aria-label="{esc(title)}">'
+        f"<span>{esc(title)}</span>{extra}</div>"
+    )
+
+
+def list_thumb(lst: dict, data: dict) -> str:
+    cells = []
+    for mid in (lst.get("movies") or [])[:4]:
+        movie = data["movie_by"].get(mid)
+        if movie:
+            cells.append(f'<div class="coll-cell">{poster_block(movie, cls="gen-ph")}</div>')
+    if not cells:
+        return poster_block(lst)
+    return f'<div class="ph collage">{"".join(cells)}</div>'
 
 
 def rate_num(movie) -> float:
@@ -109,6 +143,11 @@ def load_data() -> dict:
     for lst in lists:
         for mid in lst.get("movies") or []:
             lists_by_movie[mid].append(lst)
+    movie_list_n = {mid: len(lsts) for mid, lsts in lists_by_movie.items()}
+    top_crossed = sorted(
+        (m for m in movies if movie_list_n.get(m["id"], 0) >= 3),
+        key=lambda m: (-movie_list_n.get(m["id"], 0), -rate_num(m)),
+    )[:12]
     return {
         "categories": cats,
         "lists": lists,
@@ -119,25 +158,86 @@ def load_data() -> dict:
         "movie_by": movie_by,
         "post_by": post_by,
         "lists_by_movie": lists_by_movie,
+        "movie_list_n": movie_list_n,
+        "top_crossed": top_crossed,
     }
 
 
 def movie_url(item_id: str) -> str:
-    return f"movie/{file_slug(item_id)}.html"
+    return f"/movie/{file_slug(item_id)}.html"
 
 
 def list_url(item_id: str) -> str:
-    return f"list/{file_slug(item_id)}.html"
+    return f"/list/{file_slug(item_id)}.html"
 
 
 def post_url(item_id: str) -> str:
-    return f"post/{file_slug(item_id)}.html"
+    return f"/post/{file_slug(item_id)}.html"
 
 
 def cat_url(item_id: str) -> str:
     if item_id == "featured":
-        return "lists.html"
-    return f"cat/{file_slug(item_id)}.html"
+        return "/lists.html"
+    return f"/cat/{file_slug(item_id)}.html"
+
+
+def list_cross(lst: dict, movies: list, data: dict) -> dict:
+    lid = lst["id"]
+    only, shared = [], []
+    neighbor = Counter()
+    for movie in movies:
+        others = [item for item in data["lists_by_movie"].get(movie["id"], []) if item["id"] != lid]
+        if others:
+            shared.append((movie, len(others)))
+            for other in others:
+                neighbor[other["id"]] += 1
+        else:
+            only.append(movie)
+    shared.sort(key=lambda item: -item[1])
+    neigh = []
+    for oid, count in neighbor.most_common(5):
+        other = data["list_by"].get(oid)
+        if other:
+            neigh.append((other, count))
+    directors = Counter(movie.get("director") for movie in movies if movie.get("director"))
+    return {
+        "only": only,
+        "shared": shared,
+        "neighbors": neigh,
+        "directors": directors.most_common(3),
+    }
+
+
+def list_lead(lst: dict, movies: list, cat_name: str, cross: dict | None = None) -> str:
+    name = lst.get("name") or "这份片单"
+    films = sum(1 for m in movies if not (m.get("episodes") or 0))
+    series = len(movies) - films
+    years = sorted({int(m["year"]) for m in movies if str(m.get("year") or "").isdigit()})
+    rates = [rate_num(m) for m in movies if rate_num(m)]
+    bits = [f"「{name}」在本站归在{cat_name or '片单'}类。页面按名单原顺序对照 {len(movies)} 部，不改名次。"]
+    if films and series:
+        bits.append(f"其中电影 {films} 部、剧集 {series} 部。")
+    elif films:
+        bits.append("这一页主要是电影。")
+    elif series:
+        bits.append("这一页主要是剧集。")
+    if years:
+        bits.append(f"年份从 {years[0]} 年到 {years[-1]} 年。")
+    if rates:
+        bits.append(f"有评分的条目平均豆瓣 {sum(rates) / len(rates):.1f}。")
+    if cross:
+        bits.append(f"其中 {len(cross['only'])} 部只出现在这份名单，{len(cross['shared'])} 部还能在其它名单里找到。")
+        if cross["neighbors"]:
+            names = "、".join(f'{item[0]["name"]}（重叠{item[1]}部）' for item in cross["neighbors"][:3])
+            bits.append("重叠最多的其它名单是" + names + "。")
+        if cross["shared"]:
+            bits.append(
+                "跨名单最多的是"
+                + "、".join(f'{movie.get("title")}（{count}份）' for movie, count in cross["shared"][:3])
+                + "。"
+            )
+    bits.append("本页只做对照，不转载影评，也不提供播放。")
+    return "".join(bits)
 
 
 def abs_url(path: str) -> str:
@@ -145,26 +245,21 @@ def abs_url(path: str) -> str:
 
 
 def ph(obj: dict, alt: str = "") -> str:
-    title = alt or obj.get("title") or obj.get("name") or ""
-    cover = obj.get("cover") or ""
-    if is_img(cover):
-        return (
-            f'<img class="ph" src="{esc(cover)}" loading="lazy" '
-            f'referrerpolicy="no-referrer" alt="{esc(title)}">'
-        )
-    return f'<div class="ph" role="img" aria-label="{esc(title)}"></div>'
+    return poster_block(obj, alt)
 
 
-def card(title: str, obj: dict, href: str) -> str:
+def card(title: str, obj: dict, href: str, data: dict | None = None) -> str:
+    thumb = list_thumb(obj, data) if data is not None else poster_block(obj, title)
     return (
-        f'<a class="card" href="{esc(href)}">{ph(obj, title)}'
+        f'<a class="card" href="{esc(href)}">{thumb}'
         f'<div class="grad"></div><div class="cap"><b>{esc(title)}</b></div></a>'
     )
 
 
-def hub_card(title: str, obj: dict, href: str) -> str:
+def hub_card(title: str, obj: dict, href: str, data: dict | None = None) -> str:
+    thumb = list_thumb(obj, data) if data is not None else poster_block(obj, title)
     return (
-        f'<a class="hub-card" href="{esc(href)}"><div class="thumb">{ph(obj, title)}</div>'
+        f'<a class="hub-card" href="{esc(href)}"><div class="thumb">{thumb}</div>'
         f'<div class="t">{esc(title)}</div></a>'
     )
 
@@ -205,9 +300,9 @@ def nav_html(page: str) -> str:
         for key, href, label in NAV_LINKS
     )
     return f'''<nav class="nav"><div class="wrap nav-in">
-  <a class="logo" href="index.html" aria-label="{SITE}">
-    <img src="logo.png" width="32" height="32" alt="{SITE}">
-    <span><span style="color:#ff705b;font-weight:900">Cupfox</span> {SITE}</span>
+  <a class="logo" href="/index.html" aria-label="{SITE}">
+    <span class="logo-mark">对</span>
+    <span>{SITE}</span>
   </a>
   <div class="nav-links">{links}</div>
   <div class="nav-right">
@@ -218,68 +313,29 @@ def nav_html(page: str) -> str:
 
 
 def foot_html() -> str:
-    return '''<footer>
+    return f'''<footer>
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <div class="logo" style="font-size:20px;margin-bottom:10px"><img src="logo.png" width="28" height="28" alt="茶杯狐"><span><span style="color:#ff705b;font-weight:900">Cupfox</span> 茶杯狐</span></div>
-      <p class="foot-desc">茶杯狐是电影电视剧推荐与高分片单导航站。收录豆瓣高分、IMDB 高分、奥斯卡最佳影片、国产剧、美剧、日剧、韩剧、动漫和纪录片名单，按类型、导演、演员和观看顺序帮你解决片荒、挑今晚看什么。本站展示公开片单与编辑文章，不提供在线播放。</p>
+      <div class="logo" style="font-size:20px;margin-bottom:10px"><span class="logo-mark">对</span><span>{SITE}</span></div>
+      <p class="foot-desc">独立片单交叉索引：计算重叠、年份和观看顺序。不转载其它站点的盘点文章，不提供在线播放。</p>
       <p class="foot-mail">联系邮箱 <a href="mailto:2201219073@qq.com">2201219073@qq.com</a></p>
     </div>
     <div class="foot-col">
-      <h3>热门分类</h3>
-      <a href="lists.html">精选片单</a>
-      <a href="cat/genre.html">类型题材</a>
-      <a href="cat/region.html">国产剧 / 美剧 / 日韩</a>
-      <a href="cat/award.html">奥斯卡获奖作品</a>
-      <a href="cat/order.html">系列观看顺序</a>
-      <a href="cat/director.html">导演代表作</a>
-      <a href="cat/actor.html">演员代表作</a>
-      <a href="posts.html">影视盘点文章</a>
+      <h3>浏览</h3>
+      <a href="/lists.html">全部片单</a>
+      <a href="/cat/order.html">观看顺序</a>
+      <a href="/cat/award.html">获奖作品</a>
+      <a href="/method.html">方法</a>
     </div>
     <div class="foot-col">
-      <h3>高分片单</h3>
-      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a>
-      <a href="list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a>
-      <a href="list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a>
-      <a href="list/list-豆瓣高分日剧推荐.html">豆瓣高分日剧</a>
-      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分欧美剧</a>
-      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a>
-      <a href="list/list-经典悬疑电影推荐.html">悬疑电影推荐</a>
-      <a href="list/list-经典科幻电影推荐.html">科幻电影推荐</a>
-    </div>
-    <div class="foot-col">
-      <h3>站点与帮助</h3>
-      <a href="index.html">首页 · 今晚看什么</a>
-      <a href="about.html#about">关于茶杯狐</a>
-      <a href="about.html#copyright">版权声明</a>
-      <a href="about.html#contact">联系我们</a>
-      <a href="about.html#complaint">侵权投诉</a>
-      <a href="about.html#help">帮助反馈</a>
+      <h3>站点</h3>
+      <a href="/about.html#about">关于</a>
+      <a href="/about.html#copyright">版权声明</a>
+      <a href="/about.html#contact">联系</a>
+      <a href="/about.html#complaint">侵权投诉</a>
     </div>
   </div>
-  <div class="wrap">
-    <div class="foot-keys" aria-label="热门搜索">
-      <a href="index.html">电影推荐</a>
-      <a href="index.html">电视剧推荐</a>
-      <a href="index.html">今晚看什么</a>
-      <a href="lists.html">高分片单</a>
-      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分</a>
-      <a href="list/list-imdb高分欧美剧推荐.html">IMDB高分</a>
-      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡</a>
-      <a href="list/list-大陆经典电影推荐.html">国产电影</a>
-      <a href="list/list-经典动作电影推荐.html">动作电影</a>
-      <a href="list/list-经典喜剧电影推荐.html">喜剧电影</a>
-      <a href="list/list-经典爱情电影推荐.html">爱情电影</a>
-      <a href="list/list-经典恐怖电影推荐.html">恐怖电影</a>
-      <a href="list/list-经典动画电影推荐.html">动画电影</a>
-      <a href="list/list-经典纪录片电影推荐.html">纪录片</a>
-      <a href="list/list-豆瓣高分国漫推荐.html">国漫推荐</a>
-      <a href="list/list-豆瓣高分日漫推荐.html">日漫推荐</a>
-      <a href="cat/order.html">观看顺序</a>
-      <a href="posts.html">影视盘点</a>
-    </div>
-    <div class="copy">© Cupfox 茶杯狐 · 公开影视片单与文章的本地归档展示 · 电影推荐 / 电视剧推荐 / 高分片单 · 不提供在线播放</div>
-  </div>
+  <div class="wrap"><div class="copy">© {SITE} · 交叉索引 · 不提供在线播放</div></div>
 </footer>'''
 
 
@@ -299,14 +355,13 @@ def page_doc(
     path: str = "",
     keywords: str = "",
 ) -> str:
-    base = "../" if nested else "./"
     robots = "noindex,follow" if noindex else "index,follow"
     canonical = abs_url(path) if path and not noindex else ""
     canon = f'<link rel="canonical" href="{esc(canonical)}"/>' if canonical else ""
     og_url = f'<meta property="og:url" content="{esc(canonical)}"/>' if canonical else ""
     og_img = f'<meta property="og:image" content="{esc(image)}"/>' if image else ""
-    keys = seo_keywords(keywords or (SITE_KEYWORDS if not noindex else ""))
-    key_tag = f'<meta name="keywords" content="{esc(keys)}"/>' if keys and not noindex else ""
+    keys = seo_keywords(keywords) if keywords and not noindex else ""
+    key_tag = f'<meta name="keywords" content="{esc(keys)}"/>' if keys else ""
     ld = ""
     if json_ld:
         if canonical and "url" not in json_ld and "@graph" not in json_ld:
@@ -318,7 +373,6 @@ def page_doc(
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<base href="{base}"/>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(clip_desc(description))}"/>
 {key_tag}
@@ -331,10 +385,8 @@ def page_doc(
 {og_url}
 {og_img}
 {canon}
-<link rel="icon" href="favicon.ico" sizes="any"/>
-<link rel="icon" type="image/png" href="logo.png"/>
-<link rel="apple-touch-icon" href="logo.png"/>
-<link rel="stylesheet" href="styles.css"/>
+<link rel="icon" href="/favicon.ico" sizes="any"/>
+<link rel="stylesheet" href="/styles.css"/>
 {extra_head}
 {ld}
 </head>
@@ -343,7 +395,7 @@ def page_doc(
 {body}
 <div id="foot">{foot_html()}</div>
 <script>window.PAGE={json.dumps(page)};</script>
-<script src="app.js"></script>
+<script src="/app.js"></script>
 {scripts}
 </body>
 </html>
@@ -411,13 +463,6 @@ def graph_hops(memberships, articles):
     add_list((by_cat["order"] or [None])[0], "order", "观看顺序，下一跳按名单走。")
     add_list((by_cat["actor"] or by_cat["director"] or [None])[0], "person", "人物片单，适合接着看同一人的其它作品。")
     add_list((by_cat["subgenre"] or by_cat["genre"] or by_cat["style"] or [None])[0], "topic", "题材片单，沿这条口味继续找。")
-    if articles:
-        return hops[:2] + [{
-            "kind": "post",
-            "title": articles[0]["title"],
-            "href": post_url(articles[0]["id"]),
-            "desc": "站内文章提到了这部片。",
-        }]
     return hops[:3]
 
 
@@ -541,8 +586,9 @@ def movie_json_ld(movie) -> dict:
         data["director"] = {"@type": "Person", "name": movie["director"]}
     if movie.get("actors"):
         data["actor"] = [{"@type": "Person", "name": name} for name in movie["actors"][:8]]
-    if is_img(movie.get("cover") or ""):
-        data["image"] = movie["cover"]
+    cover = public_cover(movie.get("cover") or "")
+    if cover:
+        data["image"] = cover
     data["url"] = abs_url(movie_url(movie["id"]))
     if rate_num(movie):
         data["aggregateRating"] = {
@@ -568,8 +614,7 @@ def desc_movie(movie, n_lists: int) -> str:
     bits.append(f"入选{n_lists}个片单")
     syn = (movie.get("syn") or "").strip()
     text = "，".join(bits) + "。" + syn
-    title = movie.get("title") or "这部影片"
-    text += f"{title}电影推荐，可对照豆瓣评分与站内高分片单继续挑片。"
+    text += "详情页用来看它还出现在哪些名单里，不是播放页。"
     return clip_desc(text)
 
 
@@ -579,78 +624,64 @@ def write(path: Path, text: str):
 
 
 def render_index(data) -> str:
-    posts = data["posts"][:8]
-    slides = []
-    for i, post in enumerate(posts):
-        tags = " / ".join(post.get("tags") or []) or "影视盘点"
-        on = " is-on" if i == 0 else ""
-        slides.append(
-            f'<a class="hero-big{on}" href="{esc(post_url(post["id"]))}">{ph(post)}'
-            f'<div class="grad"></div><div class="cap"><h2>{esc(post.get("title"))}</h2>'
-            f"<p>编辑精选 · {esc(tags)}</p></div></a>"
-        )
-    arrows = ""
-    if len(posts) > 1:
-        arrows = (
-            '<button type="button" class="hero-arrow hero-prev" data-d="-1" aria-label="上一篇">'
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>'
-            '<button type="button" class="hero-arrow hero-next" data-d="1" aria-label="下一篇">'
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>'
-            '<div class="hero-dots">'
-            + "".join(
-                f'<button type="button" class="{"on" if i == 0 else ""}" data-i="{i}" aria-label="第 {i+1} 篇"></button>'
-                for i in range(len(posts))
-            )
-            + "</div>"
-        )
     home_cats = [c for c in data["categories"] if c["id"] != "featured"]
     cat_tiles = []
-    for i, cat in enumerate(home_cats):
-        if is_img(cat.get("cover") or ""):
-            img = f'<img class="ph" src="{esc(cat["cover"])}" loading="lazy" referrerpolicy="no-referrer" alt="{esc(cat["name"])}">'
-        else:
-            img = '<div class="ph"></div>'
-        cat_tiles.append(f'<a class="cat" href="{esc(cat_url(cat["id"]))}">{img}<b>{esc(cat["name"])}</b></a>')
+    for cat in home_cats:
+        cat_tiles.append(
+            f'<a class="cat" href="{esc(cat_url(cat["id"]))}">{poster_block(cat)}'
+            f'<b>{esc(cat["name"])}</b></a>'
+        )
+    crossed = []
+    for movie in data.get("top_crossed") or []:
+        n = data["movie_list_n"].get(movie["id"], 0)
+        crossed.append(
+            f'<a class="cross-hit" href="{esc(movie_url(movie["id"]))}">'
+            f'{poster_block(movie)}<div><b>{esc(movie.get("title"))}</b>'
+            f"<span>出现在 {n} 份片单</span></div></a>"
+        )
     sections = [
         '''<section id="tonight">
       <div class="sec-head"><div class="sec-title">今晚看什么</div></div>
-      <p class="tonight-empty">点任意一个标签，给你三部今晚能看的。</p>
-    </section>'''
+      <p class="tonight-empty">点任意一个标签，从现有名单里抽三部。</p>
+    </section>''',
+        f'''<section>
+      <div class="sec-head"><div class="sec-title">交叉最多的作品</div><a class="btn-sm" href="/method.html">怎么算的</a></div>
+      <p class="home-note">按「同时出现在几份名单」排序，不是热搜，也不是转载盘点。</p>
+      <div class="cross-hits">{"".join(crossed)}</div>
+    </section>''',
     ]
     for cat in home_cats:
-        rows = [l for l in data["lists"] if l.get("category") == cat["id"]][:6]
+        rows = [lst for lst in data["lists"] if lst.get("category") == cat["id"]][:6]
         if not rows:
             continue
-        cards = "".join(card(l["name"], l, list_url(l["id"])) for l in rows)
+        cards = "".join(card(lst["name"], lst, list_url(lst["id"]), data) for lst in rows)
         sections.append(
             f'<section><div class="sec-head"><div class="sec-title">{esc(cat["name"])}</div>'
             f'<a class="btn-sm" href="{esc(cat_url(cat["id"]))}">更多</a></div>'
             f'<div class="sec-row">{cards}</div></section>'
         )
-    cover = posts[0].get("cover") if posts else ""
-    body = f'''<section><div class="wrap">
-  <div class="hero-split">
-    <div id="heroBig" class="hero-carousel">{"".join(slides)}{arrows}</div>
+    n_lists = len(data["lists"])
+    n_movies = len(data["movies"])
+    n_multi = sum(1 for count in data["movie_list_n"].values() if count >= 3)
+    body = f'''<section class="hero-plain">
+  <div class="wrap">
+    <p class="hero-kicker">独立片单交叉索引</p>
+    <h1 class="home-h1">看一部作品还出现在哪些名单里</h1>
+    <p class="hero-lead">本站不转载其它导航站的盘点文章，也不镜像海报。公开片单收进来之后，只计算重叠、年份和观看顺序。</p>
+    <div class="hero-stats">
+      <div><b>{n_lists}</b><span>份公开片单</span></div>
+      <div><b>{n_movies}</b><span>部对照作品</span></div>
+      <div><b>{n_multi}</b><span>部出现在 3 份以上名单</span></div>
+    </div>
     <div class="hero-cats" id="heroCats">{"".join(cat_tiles)}</div>
   </div>
-</div></section>
+</section>
 <main class="wrap" id="cats">
-  <h1 class="home-h1">茶杯狐 · 电影电视剧推荐与高分片单</h1>
   {"".join(sections)}
   <section class="home-seo" aria-label="站点介绍">
-    <h2>片荒剧荒就来茶杯狐</h2>
-    <p>想找电影推荐、电视剧推荐或今晚看什么时，先看豆瓣高分、IMDB 高分和奥斯卡最佳影片，再按动作、喜剧、科幻、悬疑、爱情、动画这些类型往下翻。国产剧、美剧、日剧、韩剧、港剧、纪录片、国漫和日漫都做成了片单；系列作品还有观看顺序，导演和演员也能从代表作入口进去。</p>
-    <p>每部影片会标出它还出现在哪些名单里，方便顺着高分片单继续挑，而不是只看一个评分。茶杯狐只做公开片单与文章的本地展示，不提供在线播放。</p>
-    <div class="home-seo-links">
-      <a href="list/list-豆瓣高分国产剧推荐.html">豆瓣高分国产剧</a>
-      <a href="list/list-豆瓣高分美剧推荐.html">豆瓣高分美剧</a>
-      <a href="list/list-豆瓣高分韩剧推荐.html">豆瓣高分韩剧</a>
-      <a href="list/list-历届奥斯卡最佳影片.html">奥斯卡最佳影片</a>
-      <a href="list/list-经典悬疑电影推荐.html">悬疑电影</a>
-      <a href="list/list-经典科幻电影推荐.html">科幻电影</a>
-      <a href="cat/order.html">观看顺序</a>
-      <a href="posts.html">影视盘点</a>
-    </div>
+    <h2>和名单原文站的差别</h2>
+    <p>名单标题和出品信息是公开事实，很多站点都会列出。本站多出来的是交叉：一份名单和另一份叠了多少、一部片只在这里还是到处都有、系列里的上一跳下一跳。</p>
+    <p>影片详情页只给站内用户看交叉，不向搜索引擎要求收录。要了解计算方式，见<a href="/method.html">方法</a>。</p>
   </section>
 </main>'''
     return page_doc(
@@ -659,33 +690,17 @@ def render_index(data) -> str:
         nested=False,
         page="home",
         body=body,
-        image=cover if is_img(cover or "") else "",
-        scripts="<script>Cupfox.loadData().then(d=>{Cupfox.bindTonight(document.getElementById('tonight'), d);Cupfox.bindHero(document.getElementById('heroBig'), d.posts);});</script>",
+        scripts="<script>Cupfox.loadData().then(d=>Cupfox.bindTonight(document.getElementById('tonight'), d));</script>",
         path="index.html",
-        keywords=SITE_KEYWORDS,
+        keywords=seo_keywords(SITE, "片单交叉", "观看顺序"),
         json_ld={
             "@context": "https://schema.org",
-            "@graph": [
-                {
-                    "@type": "WebSite",
-                    "name": SITE,
-                    "alternateName": ["Cupfox", "茶杯狐电影推荐"],
-                    "url": abs_url("index.html"),
-                    "description": HOME_DESCRIPTION,
-                    "inLanguage": "zh-CN",
-                    "publisher": {"@type": "Organization", "name": SITE, "email": "2201219073@qq.com"},
-                },
-                {
-                    "@type": "ItemList",
-                    "name": "茶杯狐热门片单",
-                    "itemListElement": [
-                        {"@type": "ListItem", "position": 1, "name": "豆瓣高分国产剧推荐", "url": abs_url("list/list-豆瓣高分国产剧推荐.html")},
-                        {"@type": "ListItem", "position": 2, "name": "豆瓣高分美剧推荐", "url": abs_url("list/list-豆瓣高分美剧推荐.html")},
-                        {"@type": "ListItem", "position": 3, "name": "历届奥斯卡最佳影片", "url": abs_url("list/list-历届奥斯卡最佳影片.html")},
-                        {"@type": "ListItem", "position": 4, "name": "经典悬疑电影推荐", "url": abs_url("list/list-经典悬疑电影推荐.html")},
-                    ],
-                },
-            ],
+            "@type": "WebSite",
+            "name": SITE,
+            "url": abs_url("index.html"),
+            "description": HOME_DESCRIPTION,
+            "inLanguage": "zh-CN",
+            "publisher": {"@type": "Organization", "name": SITE, "email": "2201219073@qq.com"},
         },
     )
 
@@ -698,23 +713,24 @@ def render_hub(data, cat_id: str) -> str:
         f'<a href="{esc(cat_url(c["id"]))}" class="{"active" if c["id"]==cat_id else ""}">{esc(c["name"])}</a>'
         for c in data["categories"]
     )
-    grid = "".join(hub_card(l["name"], l, list_url(l["id"])) for l in lists)
+    grid = "".join(hub_card(l["name"], l, list_url(l["id"]), data) for l in lists)
+    blurb = HUB_BLURBS.get(cat_id, "按名单对照挑片。")
     body = f'''<div class="wrap hub">
   <aside class="side-menu">{menu}</aside>
   <main>
-    <h1 class="hub-title">{esc(title)} · {len(lists)} 份电影电视剧片单</h1>
+    <h1 class="hub-title">{esc(title)} · {len(lists)}</h1>
+    <p class="hub-lead">{esc(blurb)}</p>
     <div class="hub-grid">{grid}</div>
   </main>
 </div>'''
-    blurb = HUB_BLURBS.get(cat_id, "按名单挑电影电视剧。")
     return page_doc(
-        title=f"{title} - 电影电视剧推荐片单 | {SITE}",
-        description=clip_desc(f"{title}共{len(lists)}份片单。{blurb}适合片荒时按高分名单挑今晚看什么。"),
+        title=f"{title} · 交叉索引 - {SITE}",
+        description=clip_desc(f"{title}共 {len(lists)} 份片单。{blurb}"),
         nested=(cat_id != "featured"),
         page="lists",
         body=body,
         path=cat_url(cat_id),
-        keywords=seo_keywords(title, "电影推荐,电视剧推荐,高分片单,今晚看什么", SITE_KEYWORDS),
+        keywords=seo_keywords(title, "片单", SITE),
     )
 
 
@@ -723,11 +739,30 @@ def render_list(lst, data) -> str:
     movies = [data["movie_by"][mid] for mid in lst.get("movies") or [] if mid in data["movie_by"]]
     items = "".join(movie_item(m, i + 1) for i, m in enumerate(movies))
     toc = "".join(f'<a href="#m{i+1}">{i+1}. {esc(m.get("title"))}</a>' for i, m in enumerate(movies))
-    names = "、".join(m.get("title") or "" for m in movies[:8])
     cat_name = cat["name"] if cat else ""
+    cross = list_cross(lst, movies, data)
+    lead = list_lead(lst, movies, cat_name, cross)
+    overlap_links = "".join(
+        f'<a href="{esc(list_url(other["id"]))}">{esc(other["name"])} · {count} 部重叠</a>'
+        for other, count in cross["neighbors"]
+    )
+    overlap_block = (
+        f'<div class="overlap-lists">{overlap_links}</div>' if overlap_links else ""
+    )
+    stats = (
+        f'<div class="list-stats">'
+        f'<div class="list-stat"><b>{len(movies)}</b><span>本页条目</span></div>'
+        f'<div class="list-stat"><b>{len(cross["only"])}</b><span>只在这份名单</span></div>'
+        f'<div class="list-stat"><b>{len(cross["shared"])}</b><span>还出现在其它名单</span></div>'
+        f'<div class="list-stat"><b>{len(cross["neighbors"])}</b><span>重叠最多的邻单</span></div>'
+        f"</div>"
+    )
     body = f'''<div class="wrap">
-  <div class="crumb"><a href="index.html">首页</a><span class="sep">/</span><a href="lists.html">全部片单</a><span class="sep">/</span><span>{esc(lst.get("name"))}</span></div>
-  <h1 class="page-title">{esc(lst.get("name"))} <span class="cat-tag">{esc(cat_name)}</span></h1>
+  <div class="crumb"><a href="/index.html">首页</a><span class="sep">/</span><a href="/lists.html">全部片单</a><span class="sep">/</span><span>{esc(lst.get("name"))}</span></div>
+  <h1 class="page-title">{esc(lst.get("name"))} · 交叉对照 <span class="cat-tag">{esc(cat_name)}</span></h1>
+  <p class="list-lead">{esc(lead)}</p>
+  {stats}
+  {overlap_block}
   <div class="filter-bar" id="filterBar">
     <button class="btn-sm active" data-f="all">全部</button>
     <button class="btn-sm" data-f="film">电影</button>
@@ -735,31 +770,27 @@ def render_list(lst, data) -> str:
     <span class="list-count">共 {len(movies)} 部</span>
   </div>
   <div class="list-layout">
-    <div class="list-back-col"><a class="list-back" href="lists.html">‹ 全部片单</a></div>
+    <div class="list-back-col"><a class="list-back" href="/lists.html">‹ 全部片单</a></div>
     <div class="movie-list" id="movieList">{items or '<div class="empty">该片单没有影片</div>'}</div>
     <nav class="toc"><h4>内容导航</h4><div class="toc-links">{toc}</div></nav>
   </div>
 </div>'''
     return page_doc(
-        title=f'{lst.get("name")} - 电影电视剧推荐 | {SITE}',
-        description=clip_desc(
-            f'{lst.get("name")}（{cat_name}）共{len(movies)}部电影电视剧推荐。'
-            + (f"{names}。" if names else "")
-            + "含豆瓣评分、导演主演，适合片荒时按名单挑片。"
-        ),
+        title=f'{lst.get("name")} · 交叉对照 - {SITE}',
+        description=clip_desc(lead),
         nested=True,
         page="lists",
         body=body,
         body_class="list-detail-page",
-        image=lst.get("cover") if is_img(lst.get("cover") or "") else "",
-        keywords=seo_keywords(lst.get("name"), cat_name, names.replace("、", ","), "片单,电影推荐,电视剧推荐,豆瓣高分"),
+        keywords=seo_keywords(lst.get("name"), "交叉对照", SITE),
         json_ld={
             "@context": "https://schema.org",
             "@type": "ItemList",
-            "name": lst.get("name"),
+            "name": f'{lst.get("name")} · 交叉对照',
+            "description": clip_desc(lead),
             "numberOfItems": len(movies),
             "itemListElement": [
-                {"@type": "ListItem", "position": i + 1, "name": m.get("title"), "url": abs_url(movie_url(m["id"]))}
+                {"@type": "ListItem", "position": i + 1, "name": m.get("title")}
                 for i, m in enumerate(movies[:50])
             ],
         },
@@ -863,7 +894,7 @@ def render_movie(movie, data) -> str:
     count = movie.get("count") or ""
     max_html = f'<div class="graph-stat"><b>{max_shared}</b><span>最高同框数</span></div>' if max_shared else ""
     body = f'''<div class="wrap" id="detailRoot">
-    <div class="crumb"><a href="index.html">首页</a><span class="sep">/</span><a href="lists.html">影片</a><span class="sep">/</span><span>{esc(movie.get("title"))}</span></div>
+    <div class="crumb"><a href="/index.html">首页</a><span class="sep">/</span><a href="/lists.html">影片</a><span class="sep">/</span><span>{esc(movie.get("title"))}</span></div>
     <div class="detail">
       <div class="cover">{ph(movie)}</div>
       <div class="info">
@@ -894,93 +925,57 @@ def render_movie(movie, data) -> str:
         nested=True,
         page="",
         body=body,
-        image=movie.get("cover") if is_img(movie.get("cover") or "") else "",
-        json_ld=movie_json_ld(movie),
+        noindex=True,
         path=movie_url(movie["id"]),
-        keywords=seo_keywords(
-            movie.get("title"),
-            movie.get("orig"),
-            movie.get("director"),
-            ",".join((movie.get("actors") or [])[:4]),
-            ",".join(movie.get("tags") or []),
-            "电影推荐,豆瓣评分,高分片单",
-        ),
     )
 
 
-def render_posts(data) -> str:
-    grid = "".join(hub_card(p["title"], p, post_url(p["id"])) for p in data["posts"])
+def render_method(data) -> str:
+    n_lists = len(data["lists"])
+    n_movies = len(data["movies"])
+    n_multi = sum(1 for count in data["movie_list_n"].values() if count >= 3)
     body = f'''<div class="wrap">
-    <h1 class="hub-title" style="padding-top:20px">影视盘点文章 · 电影电视剧推荐</h1>
-  <div class="hub-grid" style="--side-w:auto">{grid}</div>
+  <article class="page-doc">
+    <h1>交叉怎么算</h1>
+    <p class="lead">片单对照只发布自己算出来的重叠关系，不转载其它站点的盘点正文和海报。</p>
+    <h2 id="source">用了哪些名单</h2>
+    <p>数据层是公开片单的标题、顺序和作品字段：片名、年份、导演、主演、豆瓣评分。目前共 {n_lists} 份名单、{n_movies} 部作品。名单名称来自各自的公开出处，本站不改名次，也不另写影评。</p>
+    <h2 id="overlap">重叠</h2>
+    <p>一部作品每进入一份名单，计数加一。出现在 3 份以上名单的作品目前有 {n_multi} 部。名单页会写出：有多少部只在这一份里、有多少部还能在别处找到，以及重叠最多的邻单。</p>
+    <p>「同框最多」按两部作品共享的名单数排序，不是按类型随便抽几部。</p>
+    <h2 id="order">观看顺序</h2>
+    <p>只有归在观看顺序类的名单才提供上一跳和下一跳。顺序以该名单原有排列为准，本站不重排系列宇宙。</p>
+    <h2 id="index">哪些页给搜索引擎看</h2>
+    <p>可收录的是首页、分类枢纽、各片单对照页、本页和关于页。影片详情只给站内跳转看交叉，带 noindex，也不进 sitemap。旧的转载文章已经撤下，不再作为内容页。</p>
+    <h2 id="play">不提供什么</h2>
+    <p>没有播放器，没有片源，没有账号。海报不再热链其它站点，卡片用本站生成的色块标题图。</p>
+  </article>
 </div>'''
     return page_doc(
-        title=f"影视盘点文章 - 电影电视剧推荐 | {SITE}",
-        description="茶杯狐影视盘点与预告：高分国产剧、悬疑电影、动画电影、奥斯卡和院线看点，帮你决定今晚看什么。",
+        title=f"交叉怎么算 - {SITE}",
+        description="说明片单对照如何计算名单重叠、独有条目和观看顺序，以及哪些页面不向搜索引擎要求收录。",
         nested=False,
-        page="posts",
+        page="method",
         body=body,
-        path="posts.html",
-        keywords=seo_keywords("影视盘点,电影推荐,国产剧,悬疑电影,动画电影,奥斯卡", SITE_KEYWORDS),
-    )
-
-
-def render_post(post) -> str:
-    sections = post.get("sections") or []
-    body_parts = []
-    for i, sec in enumerate(sections):
-        images = "".join(
-            f'<figure><img src="{esc(src)}" loading="lazy" referrerpolicy="no-referrer" alt="{esc(sec.get("h"))}">'
-            f'<figcaption>{esc(sec.get("h"))}{(" · " + str(n+1)) if len(sec.get("images") or [])>1 else ""}</figcaption></figure>'
-            for n, src in enumerate(sec.get("images") or [])
-        )
-        body_parts.append(
-            f'<h2 id="p{i+1}">{esc(sec.get("h"))}</h2><p>{esc(sec.get("body"))}</p>'
-            f'<div class="section-images">{images}</div>'
-        )
-    toc = "".join(f'<a href="#p{i+1}">{i+1}. {esc(s.get("h"))}</a>' for i, s in enumerate(sections))
-    tags = "".join(f'<span class="tag">{esc(t)}</span>' for t in post.get("tags") or [])
-    cover = ""
-    if is_img(post.get("cover") or ""):
-        cover = f'<figure style="margin:16px 0 24px"><div class="ph" style="background-image:url(\'{esc(post["cover"])}\');aspect-ratio:16/9"></div></figure>'
-    intro = f'<p class="intro">{esc(post.get("intro"))}</p>' if post.get("intro") else ""
-    article = f'''<div class="wrap">
-  <div class="crumb"><a href="posts.html">全部文章</a><span class="sep">/</span><span>{esc(post.get("title"))}</span></div>
-  <div class="article-wrap">
-    <article class="article">
-      <h1>{esc(post.get("title"))}</h1>
-      <div class="meta-row"><span class="tag">原创</span><span class="tag">{esc(post.get("author"))}</span>
-        <span class="tag">{esc(post.get("date"))}</span>{tags}</div>
-      {intro}{cover}{"".join(body_parts)}
-    </article>
-    <nav class="toc"><h4>内容导航</h4><div class="toc-links">{toc}</div></nav>
-  </div>
-</div>'''
-    desc = clip_desc(
-        (post.get("intro") or post.get("title") or "")
-        + "茶杯狐影视盘点，电影电视剧推荐与今晚看什么参考。"
-    )
-    return page_doc(
-        title=f'{post.get("title")} - {SITE}',
-        description=desc,
-        nested=True,
-        page="posts",
-        body=article,
-        image=post.get("cover") if is_img(post.get("cover") or "") else "",
-        json_ld={"@context": "https://schema.org", "@type": "Article", "headline": post.get("title"), "author": post.get("author"), "datePublished": post.get("date")},
-        path=post_url(post["id"]),
-        keywords=seo_keywords(post.get("title"), ",".join(post.get("tags") or []), "影视盘点,电影推荐,今晚看什么"),
+        path="method.html",
+        keywords=seo_keywords(SITE, "交叉索引", "方法"),
+        json_ld={
+            "@context": "https://schema.org",
+            "@type": "TechArticle",
+            "headline": "交叉怎么算",
+            "name": f"交叉怎么算 - {SITE}",
+        },
     )
 
 
 ABOUT_BODY = '''<div class="wrap">
-  <div class="crumb"><a href="index.html">首页</a><span class="sep">/</span><span>关于与联系</span></div>
+  <div class="crumb"><a href="/index.html">首页</a><span class="sep">/</span><span>关于与联系</span></div>
   <article class="page-doc">
     <h1>关于与联系</h1>
-    <p class="lead">电影电视剧推荐与高分片单导航，片荒时用来挑片，不是播放站。</p>
-    <h2 id="about">关于茶杯狐</h2>
-    <p>本站把公开的影视片单和编辑文章做成可检索的本地展示：按豆瓣高分、奥斯卡、类型题材和观看顺序逛名单，按共现关系看一部片还出现在哪些单子里，并用「今晚看什么」在几个标签里给出三部今晚能看的。</p>
-    <p>站点没有账号，也不提供在线播放。海报和正文保留原公开来源，方便对照查阅。</p>
+    <p class="lead">独立片单交叉索引，不是播放站，也不转载其它导航站的盘点文章。</p>
+    <h2 id="about">关于片单对照</h2>
+    <p>本站把公开片单做成可检索的交叉索引：一部作品同时出现在哪些名单里、和哪几部共享最多名单、系列该按什么顺序看。「今晚看什么」只在现有名单里抽三部。</p>
+    <p>没有账号，也不提供在线播放。评分和片名来自各自的公开来源。卡片图由本站按标题生成，不热链其它站点的海报。影片详情只用来看交叉，不向搜索引擎要求收录。</p>
     <h2 id="copyright">版权声明</h2>
     <p>片单名称、影片信息、海报和文章内容来自各自的公开来源，版权归原作者、原网站或权利人所有。本站仅作个人学习与浏览展示，不存储片源，不用于商业传播。</p>
     <p>页面中出现的豆瓣评分、评价人数等公开数据仅供参考，如与来源不一致，以来源为准。</p>
@@ -1005,8 +1000,8 @@ def render_redirect(kind: str) -> str:
     scripts = {
         "movie": "Cupfox.loadData().then(d=>{const id=Cupfox.param('movie');const m=id&&d.movieById[id]; if(m) location.replace(Cupfox.detailUrl(m.id)); else document.body.insertAdjacentHTML('afterbegin','<p class=\"empty\">未找到该影片</p>');});",
         "list": "Cupfox.loadData().then(d=>{const id=Cupfox.param('list');const l=id&&d.listById[id]; if(l) location.replace(Cupfox.listUrl(l.id)); else document.body.insertAdjacentHTML('afterbegin','<p class=\"empty\">未找到该片单</p>');});",
-        "post": "Cupfox.loadData().then(d=>{const id=Cupfox.param('post');const p=id&&d.postById[id]; if(p) location.replace(Cupfox.postUrl(p.id)); else document.body.insertAdjacentHTML('afterbegin','<p class=\"empty\">未找到该文章</p>');});",
-        "cat": "Cupfox.loadData().then(d=>{const cat=Cupfox.param('cat'); if(cat) location.replace(Cupfox.catUrl(cat)); else location.replace('lists.html');});",
+        "post": "location.replace('/method.html');",
+        "cat": "Cupfox.loadData().then(d=>{const cat=Cupfox.param('cat'); if(cat) location.replace(Cupfox.catUrl(cat)); else location.replace('/lists.html');});",
     }[kind]
     titles = {"movie": "影片", "list": "片单", "post": "文章", "cat": "分类"}
     return page_doc(
@@ -1028,14 +1023,16 @@ Disallow: /play.html
 Disallow: /detail.html
 Disallow: /list.html
 Disallow: /post.html
+Disallow: /post/
+Disallow: /movie/
 
 Sitemap: {urljoin(base_url.rstrip('/') + '/', sitemap_path)}
 """
     (ROOT / "robots.txt").write_text(robots, encoding="utf-8")
     urls = []
     for path in paths:
-        loc = urljoin(base_url.rstrip("/") + "/", path)
-        urls.append(f"  <url><loc>{esc(loc)}</loc></url>")
+        loc = urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+        urls.append(f"  <url><loc>{esc(loc)}</loc><lastmod>{BUILD_DATE}</lastmod></url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
     (ROOT / "sitemap.xml").write_text(xml, encoding="utf-8")
 
@@ -1070,16 +1067,28 @@ def main():
     if clashes:
         raise SystemExit("filename clash: " + str(clashes))
 
-    sitemap = ["index.html", "lists.html", "posts.html", "about.html"]
+    sitemap = ["index.html", "lists.html", "method.html", "about.html"]
     write(ROOT / "index.html", render_index(data))
     write(ROOT / "lists.html", render_hub(data, "featured"))
-    write(ROOT / "posts.html", render_posts(data))
+    write(ROOT / "method.html", render_method(data))
+    write(
+        ROOT / "posts.html",
+        page_doc(
+            title=f"已下线 - {SITE}",
+            description="转载盘点文章已从本站撤下。",
+            nested=False,
+            page="method",
+            body='<div class="wrap"><article class="page-doc"><h1>文章已下线</h1><p class="lead">本站不再发布从其它导航站转来的盘点文章。<a href="/method.html">改为阅读交叉方法</a>。</p></article></div>',
+            noindex=True,
+            scripts='<script>location.replace("/method.html");</script>',
+        ),
+    )
     write(
         ROOT / "about.html",
         page_doc(
             title=f"关于与联系 - {SITE}",
-            description="茶杯狐介绍：电影电视剧推荐与高分片单导航站，版权声明、联系邮箱与侵权投诉方式。不提供在线播放。",
-            keywords=seo_keywords("茶杯狐,关于茶杯狐,版权声明", SITE_KEYWORDS),
+            description="片单对照的介绍、版权声明、联系邮箱与侵权投诉方式。本站做交叉索引，不转载盘点文章，不提供在线播放。",
+            keywords=seo_keywords(SITE, "关于", "版权声明"),
             nested=False,
             page="",
             body=ABOUT_BODY,
@@ -1099,12 +1108,8 @@ def main():
     for lst in data["lists"]:
         write(ROOT / "list" / f"{file_slug(lst['id'])}.html", render_list(lst, data))
         sitemap.append(list_url(lst["id"]))
-    for post in data["posts"]:
-        write(ROOT / "post" / f"{file_slug(post['id'])}.html", render_post(post))
-        sitemap.append(post_url(post["id"]))
     for movie in data["movies"]:
         write(ROOT / "movie" / f"{file_slug(movie['id'])}.html", render_movie(movie, data))
-        sitemap.append(movie_url(movie["id"]))
 
     write_robots_sitemap(sitemap, args.base_url)
     print(
