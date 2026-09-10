@@ -23,10 +23,10 @@ DATA = ROOT / "data.jsonl"
 SITE = "茶杯狐"
 TAGLINE = "看一部片还在哪些名单里"
 ORIGIN = "https://www.cupfox.xin"
-HOME_TITLE = f"{SITE} · 公开片单的交叉索引"
+HOME_TITLE = f"{SITE} - 电影推荐、高分片单与观看顺序"
 HOME_DESCRIPTION = (
-    "茶杯狐把多份公开名单叠在一起：一部作品同时出现在哪些名单、"
-    "和哪几部共享最多名单、系列该按什么顺序看。不转载影评，不提供播放。"
+    "茶杯狐收录豆瓣高分、奥斯卡、IMDB、国产剧、美剧、日剧、韩剧和经典电影片单，"
+    "按类型、导演、演员和观看顺序挑片，也能查一部电影还进了哪些名单。不提供在线播放。"
 )
 BUILD_DATE = date.today().isoformat()
 ASSET_V = "20260910e"
@@ -588,6 +588,8 @@ def movie_json_ld(movie) -> dict:
         "name": movie.get("title"),
         "inLanguage": "zh-CN",
     }
+    if movie.get("episodes") or 0:
+        data["@type"] = "TVSeries"
     if movie.get("orig"):
         data["alternateName"] = movie["orig"]
     if movie.get("year"):
@@ -610,10 +612,30 @@ def movie_json_ld(movie) -> dict:
     return data
 
 
+def movie_kind(movie: dict) -> str:
+    if movie.get("episodes") or 0:
+        return "电视剧"
+    tags = " ".join(movie.get("tags") or [])
+    if "纪录" in tags:
+        return "纪录片"
+    if "动画" in tags or "动漫" in tags:
+        return "动画"
+    return "电影"
+
+
+def movie_page_title(movie: dict, n_lists: int) -> str:
+    title = movie.get("title") or "影片"
+    year = f" {movie['year']}" if movie.get("year") else ""
+    kind = movie_kind(movie)
+    return f"{title}{year} {kind}推荐 - 入选{n_lists}份片单 | {SITE}"
+
+
 def desc_movie(movie, n_lists: int) -> str:
+    kind = movie_kind(movie)
     bits = [movie.get("title") or "影片"]
     if movie.get("year"):
         bits.append(str(movie["year"]))
+    bits.append(f"{kind}推荐")
     tags = "、".join((movie.get("tags") or [])[:4])
     if tags:
         bits.append(tags)
@@ -624,7 +646,7 @@ def desc_movie(movie, n_lists: int) -> str:
     bits.append(f"入选{n_lists}个片单")
     syn = (movie.get("syn") or "").strip()
     text = "，".join(bits) + "。" + syn
-    text += "详情页用来看它还出现在哪些名单里，不是播放页。"
+    text += "用来看它还出现在哪些高分片单里，不是播放页。"
     return clip_desc(text)
 
 
@@ -674,9 +696,9 @@ def render_index(data) -> str:
     n_multi = sum(1 for count in data["movie_list_n"].values() if count >= 3)
     body = f'''<section class="hero-plain">
   <div class="wrap">
-    <p class="hero-kicker">独立片单交叉索引</p>
-    <h1 class="home-h1">看一部作品还出现在哪些名单里</h1>
-    <p class="hero-lead">本站不转载其它导航站的盘点文章，也不镜像海报。公开片单收进来之后，只计算重叠、年份和观看顺序。</p>
+    <p class="hero-kicker">茶杯狐 · 电影推荐</p>
+    <h1 class="home-h1">电影推荐、高分片单与观看顺序</h1>
+    <p class="hero-lead">豆瓣高分、奥斯卡、国产剧、美剧和经典电影名单收在这里。公开片单对照之后，只计算重叠、年份和观看顺序，不提供播放。</p>
     <div class="hero-stats">
       <div><b>{n_lists}</b><span>份公开片单</span></div>
       <div><b>{n_movies}</b><span>部对照作品</span></div>
@@ -690,7 +712,7 @@ def render_index(data) -> str:
   <section class="home-seo" aria-label="站点介绍">
     <h2>和名单原文站的差别</h2>
     <p>名单标题和出品信息是公开事实，很多站点都会列出。本站多出来的是交叉：一份名单和另一份叠了多少、一部片只在这里还是到处都有、系列里的上一跳下一跳。</p>
-    <p>影片详情页只给站内用户看交叉，不向搜索引擎要求收录。要了解计算方式，见<a href="/method.html">方法</a>。</p>
+    <p>影片详情页写它入选了哪些名单、和哪几部同框最多。要了解计算方式，见<a href="/method.html">方法</a>。</p>
   </section>
 </main>'''
     return page_doc(
@@ -701,7 +723,7 @@ def render_index(data) -> str:
         body=body,
         scripts="<script>Cupfox.loadData().then(d=>Cupfox.bindTonight(document.getElementById('tonight'), d));</script>",
         path="index.html",
-        keywords=seo_keywords(SITE, "片单交叉", "观看顺序"),
+        keywords=seo_keywords(SITE, "电影推荐", "高分片单", "观看顺序", "豆瓣高分", "奥斯卡", "国产剧", "美剧"),
         json_ld={
             "@context": "https://schema.org",
             "@type": "WebSite",
@@ -724,6 +746,7 @@ def render_hub(data, cat_id: str) -> str:
     )
     grid = "".join(hub_card(l["name"], l, list_url(l["id"]), data) for l in lists)
     blurb = HUB_BLURBS.get(cat_id, "按名单对照挑片。")
+    page_title = f"高分片单与电影推荐 - {SITE}" if cat_id == "featured" else f"{title}片单推荐 - {SITE}"
     body = f'''<div class="wrap hub">
   <aside class="side-menu">{menu}</aside>
   <main>
@@ -733,13 +756,13 @@ def render_hub(data, cat_id: str) -> str:
   </main>
 </div>'''
     return page_doc(
-        title=f"{title} · 交叉索引 - {SITE}",
+        title=page_title,
         description=clip_desc(f"{title}共 {len(lists)} 份片单。{blurb}"),
         nested=(cat_id != "featured"),
         page="lists",
         body=body,
         path=cat_url(cat_id),
-        keywords=seo_keywords(title, "片单", SITE),
+        keywords=seo_keywords(title, "片单推荐", "电影推荐", SITE),
     )
 
 
@@ -768,7 +791,7 @@ def render_list(lst, data) -> str:
     )
     body = f'''<div class="wrap">
   <div class="crumb"><a href="/index.html">首页</a><span class="sep">/</span><a href="/lists.html">全部片单</a><span class="sep">/</span><span>{esc(lst.get("name"))}</span></div>
-  <h1 class="page-title">{esc(lst.get("name"))} · 交叉对照 <span class="cat-tag">{esc(cat_name)}</span></h1>
+  <h1 class="page-title">{esc(lst.get("name"))} <span class="cat-tag">{esc(cat_name)}</span></h1>
   {stats}
   {overlap_block}
   <div class="filter-bar" id="filterBar">
@@ -784,17 +807,17 @@ def render_list(lst, data) -> str:
   </div>
 </div>'''
     return page_doc(
-        title=f'{lst.get("name")} · 交叉对照 - {SITE}',
+        title=f'{lst.get("name")} - {SITE}',
         description=clip_desc(lead),
         nested=True,
         page="lists",
         body=body,
         body_class="list-detail-page",
-        keywords=seo_keywords(lst.get("name"), "交叉对照", SITE),
+        keywords=seo_keywords(lst.get("name"), "片单", "电影推荐", SITE),
         json_ld={
             "@context": "https://schema.org",
             "@type": "ItemList",
-            "name": f'{lst.get("name")} · 交叉对照',
+            "name": lst.get("name"),
             "description": clip_desc(lead),
             "numberOfItems": len(movies),
             "itemListElement": [
@@ -927,14 +950,25 @@ def render_movie(movie, data) -> str:
     {neighbor_block}
     {hop_block}
 </div>'''
+    actors = movie.get("actors") or []
     return page_doc(
-        title=f'{movie.get("title")} - {SITE}',
+        title=movie_page_title(movie, len(memberships)),
         description=desc_movie(movie, len(memberships)),
         nested=True,
         page="",
         body=body,
-        noindex=True,
+        keywords=seo_keywords(
+            movie.get("title"),
+            movie.get("orig"),
+            movie.get("director"),
+            *actors[:2],
+            *(movie.get("tags") or [])[:4],
+            f"{movie_kind(movie)}推荐",
+            SITE,
+        ),
+        json_ld=movie_json_ld(movie),
         path=movie_url(movie["id"]),
+        image=public_cover(movie.get("cover") or "") or "",
     )
 
 
@@ -954,14 +988,14 @@ def render_method(data) -> str:
     <h2 id="order">观看顺序</h2>
     <p>只有归在观看顺序类的名单才提供上一跳和下一跳。顺序以该名单原有排列为准，本站不重排系列宇宙。</p>
     <h2 id="index">哪些页给搜索引擎看</h2>
-    <p>可收录的是首页、分类枢纽、各片单对照页、本页和关于页。影片详情只给站内跳转看交叉，带 noindex，也不进 sitemap。旧的转载文章已经撤下，不再作为内容页。</p>
+    <p>可收录的是首页、分类枢纽、各片单页、影片详情、本页和关于页。旧的转载文章已经撤下，不再作为内容页。影片页用来看入选了哪些名单，不是播放页。</p>
     <h2 id="play">不提供什么</h2>
     <p>没有播放器，没有片源，没有账号。海报不再热链其它站点，卡片用本站生成的色块标题图。</p>
   </article>
 </div>'''
     return page_doc(
         title=f"交叉怎么算 - {SITE}",
-        description="说明茶杯狐如何计算名单重叠、独有条目和观看顺序，以及哪些页面不向搜索引擎要求收录。",
+        description="说明茶杯狐如何计算名单重叠、独有条目和观看顺序。影片页和片单页都可以被搜索引擎收录。",
         nested=False,
         page="method",
         body=body,
@@ -983,7 +1017,7 @@ ABOUT_BODY = '''<div class="wrap">
     <p class="lead">独立片单交叉索引，不是播放站，也不转载其它导航站的盘点文章。</p>
     <h2 id="about">关于茶杯狐</h2>
     <p>本站把公开片单做成可检索的交叉索引：一部作品同时出现在哪些名单里、和哪几部共享最多名单、系列该按什么顺序看。「今晚看什么」只在现有名单里抽三部。</p>
-    <p>没有账号，也不提供在线播放。评分和片名来自各自的公开来源。卡片图由本站按标题生成，不热链其它站点的海报。影片详情只用来看交叉，不向搜索引擎要求收录。</p>
+    <p>没有账号，也不提供在线播放。评分和片名来自各自的公开来源。卡片图由本站按标题生成，不热链其它站点的海报。影片详情用来看它进了哪些名单，也可以被搜索到。</p>
     <h2 id="copyright">版权声明</h2>
     <p>片单名称、影片信息、海报和文章内容来自各自的公开来源，版权归原作者、原网站或权利人所有。本站仅作个人学习与浏览展示，不存储片源，不用于商业传播。</p>
     <p>页面中出现的豆瓣评分、评价人数等公开数据仅供参考，如与来源不一致，以来源为准。</p>
@@ -1032,7 +1066,6 @@ Disallow: /detail.html
 Disallow: /list.html
 Disallow: /post.html
 Disallow: /post/
-Disallow: /movie/
 
 Sitemap: {urljoin(base_url.rstrip('/') + '/', sitemap_path)}
 """
@@ -1043,6 +1076,16 @@ Sitemap: {urljoin(base_url.rstrip('/') + '/', sitemap_path)}
         urls.append(f"  <url><loc>{esc(loc)}</loc><lastmod>{BUILD_DATE}</lastmod></url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
     (ROOT / "sitemap.xml").write_text(xml, encoding="utf-8")
+    submit = ROOT / "submit-urls"
+    submit.mkdir(exist_ok=True)
+    lines = [urljoin(base_url.rstrip("/") + "/", path.lstrip("/")) for path in paths]
+    (submit / "all.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for old in submit.glob("day-*.txt"):
+        old.unlink()
+    batch = 2000
+    for i, start in enumerate(range(0, len(lines), batch), 1):
+        chunk = lines[start : start + batch]
+        (submit / f"day-{i:02d}.txt").write_text("\n".join(chunk) + "\n", encoding="utf-8")
 
 
 def reset_dir(path: Path):
@@ -1118,6 +1161,7 @@ def main():
         sitemap.append(list_url(lst["id"]))
     for movie in data["movies"]:
         write(ROOT / "movie" / f"{file_slug(movie['id'])}.html", render_movie(movie, data))
+        sitemap.append(movie_url(movie["id"]))
 
     write_robots_sitemap(sitemap, args.base_url)
     print(
