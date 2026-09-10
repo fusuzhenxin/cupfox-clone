@@ -82,19 +82,15 @@ function collageHtml(list, cls='ph'){
   const ids=(list.movies||[]).slice(0,4);
   const cells=ids.map(mid=>{
     const m=_dataCache?.movieById?.[mid];
-    return m ? `<div class="coll-cell" style="background-image:url('${posterSvg(m,150,225)}')"></div>` : '';
+    if(!m) return '';
+    if(isImg(m.cover)) return `<div class="coll-cell"><img class="ph" src="${esc(m.cover)}" loading="lazy" referrerpolicy="no-referrer" alt="${esc(m.title||'')}"></div>`;
+    return `<div class="coll-cell" style="background-image:url('${posterSvg(m,150,225)}')"></div>`;
   }).join('');
   return `<div class="${cls} collage">${cells || '<div class="coll-cell" style="background:'+palette(hashHue(list.id))+'"></div>'}</div>`;
 }
 
 /* ---------- 真实图片优先，SVG 兜底 ---------- */
-function isSourceHost(url){
-  try{
-    const host=new URL(url).hostname;
-    return /(^|\.)(cupfox\.love|zhimg\.com|zhihu\.com|biliimg\.com)$/i.test(host);
-  }catch(e){ return true; }
-}
-function isImg(s){ return typeof s==='string' && /^https?:\/\//i.test(s) && !isSourceHost(s); }
+function isImg(s){ return typeof s==='string' && /^https?:\/\//i.test(s); }
 function phFor(obj, w, h, kind){
   const cover = obj && obj.cover;
   if(isImg(cover)){

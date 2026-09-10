@@ -16,7 +16,7 @@ import shutil
 from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import unquote, urljoin
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data.jsonl"
@@ -29,7 +29,6 @@ HOME_DESCRIPTION = (
     "和哪几部共享最多名单、系列该按什么顺序看。不转载影评，不提供播放。"
 )
 BUILD_DATE = date.today().isoformat()
-SOURCE_IMAGE_HOSTS = ("cupfox.love", "zhimg.com", "zhihu.com", "biliimg.com")
 HUB_BLURBS = {
     "featured": "这里是全部公开片单的入口。每份名单页会写出它和其它名单重叠了多少，而不是复述原名单的宣传语。",
     "region": "按出品地和形式归类的名单。同一部作品常常同时出现在地区名单和类型名单里，重叠关系在各名单页里。",
@@ -72,10 +71,7 @@ def file_slug(item_id: str) -> str:
 
 
 def is_img(url: str) -> bool:
-    if not (isinstance(url, str) and url.lower().startswith(("http://", "https://"))):
-        return False
-    host = urlparse(url).netloc.lower()
-    return not any(src in host for src in SOURCE_IMAGE_HOSTS)
+    return isinstance(url, str) and url.lower().startswith(("http://", "https://"))
 
 
 def hash_hue(text: str) -> int:
@@ -108,22 +104,28 @@ def public_cover(url: str) -> str:
     return url if is_img(url) else ""
 
 
-def poster_block(obj: dict, alt: str = "", cls: str = "ph gen-ph") -> str:
+def poster_block(obj: dict, alt: str = "", cls: str = "ph") -> str:
     title = alt or obj.get("title") or obj.get("name") or ""
-    rate = obj.get("rate") or ""
-    extra = f"<em>{esc(rate)}</em>" if rate else ""
+    cover = obj.get("cover") or ""
+    if is_img(cover):
+        return (
+            f'<img class="{cls}" src="{esc(cover)}" loading="lazy" '
+            f'referrerpolicy="no-referrer" alt="{esc(title)}">'
+        )
     return (
-        f'<div class="{cls}" style="background:{poster_bg(obj)}" role="img" aria-label="{esc(title)}">'
-        f"<span>{esc(title)}</span>{extra}</div>"
+        f'<div class="{cls} gen-ph" style="background:{poster_bg(obj)}" '
+        f'role="img" aria-label="{esc(title)}"></div>'
     )
 
 
 def list_thumb(lst: dict, data: dict) -> str:
+    if is_img(lst.get("cover") or ""):
+        return poster_block(lst)
     cells = []
     for mid in (lst.get("movies") or [])[:4]:
         movie = data["movie_by"].get(mid)
         if movie:
-            cells.append(f'<div class="coll-cell">{poster_block(movie, cls="gen-ph")}</div>')
+            cells.append(f'<div class="coll-cell">{poster_block(movie)}</div>')
     if not cells:
         return poster_block(lst)
     return f'<div class="ph collage">{"".join(cells)}</div>'
@@ -387,7 +389,7 @@ def page_doc(
         ld = "<script type=\"application/ld+json\">" + json.dumps(json_ld, ensure_ascii=False).replace("<", "\\u003c") + "</script>"
     cls = f' class="{body_class}"' if body_class else ""
     return f'''<!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark" translate="no">
+<html lang="zh-CN" data-theme="dark" translate="no" class="notranslate">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
